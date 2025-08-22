@@ -128,46 +128,46 @@ export default function Leaderboard() {
 
     return (
         <ProtectedRoute>
-            <div className="min-h-screen bg-gray-100 p-4">
+            <div className="min-h-screen bg-gray-100 p-2 sm:p-4">
                 <div className="max-w-6xl mx-auto">
-                    <div className="bg-white rounded-lg shadow-lg p-6">
+                    <div className="bg-white rounded-lg shadow-lg p-3 sm:p-6">
                         {/* Header */}
-                        <div className="flex items-center justify-between mb-6">
-                            <h1 className="text-3xl font-bold text-black">🏆 Leaderboard</h1>
-                            <div className="flex items-center gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-black">🏆 Leaderboard</h1>
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                                 <button
                                     onClick={handleRefresh}
                                     disabled={isLoading}
-                                    className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded transition-colors"
+                                    className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-3 sm:px-4 py-2 rounded transition-colors text-sm"
                                 >
-                                    {isLoading ? '🔄' : '🔄'} Refresh
+                                    {isLoading ? '🔄' : '🔄'} <span className="hidden sm:inline">Refresh</span>
                                 </button>
                                 <a
                                     href="/gameplay"
-                                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
+                                    className="bg-blue-500 hover:bg-blue-600 text-white px-3 sm:px-4 py-2 rounded transition-colors text-sm"
                                 >
-                                    🎮 Play Game
+                                    🎮 <span className="hidden sm:inline">Play Game</span>
                                 </a>
                                 {isAdmin && (
                                     <a
                                         href="/admin"
-                                        className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded transition-colors"
+                                        className="bg-purple-500 hover:bg-purple-600 text-white px-3 sm:px-4 py-2 rounded transition-colors text-sm"
                                     >
-                                        ⚙️ Admin
+                                        ⚙️ <span className="hidden sm:inline">Admin</span>
                                     </a>
                                 )}
                             </div>
                         </div>
 
                         {/* Game Filter */}
-                        <div className="mb-6">
+                        <div className="mb-4 sm:mb-6">
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Filter by Game:
                             </label>
                             <select
                                 value={selectedGameId}
                                 onChange={(e) => setSelectedGameId(e.target.value)}
-                                className="border border-gray-300 rounded px-3 py-2 text-black bg-white"
+                                className="w-full sm:w-auto border border-gray-300 rounded px-3 py-2 text-black bg-white text-sm"
                             >
                                 <option value="all">All Games</option>
                                 {games.map(game => (
@@ -180,11 +180,11 @@ export default function Leaderboard() {
 
                         {/* Error Message */}
                         {error && (
-                            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                                <p className="text-red-800">{error}</p>
+                            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg">
+                                <p className="text-red-800 text-sm">{error}</p>
                                 <button
                                     onClick={loadScores}
-                                    className="mt-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm"
+                                    className="mt-2 bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 py-2 rounded text-sm"
                                 >
                                     🔄 Retry
                                 </button>
@@ -199,78 +199,148 @@ export default function Leaderboard() {
                             </div>
                         )}
 
-                        {/* Scores Table */}
+                        {/* Scores Table/Cards */}
                         {!isLoading && scores.length > 0 && (
-                            <div className="overflow-x-auto">
-                                <table className="w-full border-collapse border border-gray-200">
-                                    <thead>
-                                        <tr className="bg-gray-50">
-                                            <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-800">Rank</th>
-                                            <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-800">Player</th>
-                                            {selectedGameId === 'all' && (
-                                                <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-800">Game</th>
-                                            )}
-                                            <th className="border border-gray-200 px-4 py-3 text-center font-semibold text-gray-800">Score</th>
-                                            <th className="border border-gray-200 px-4 py-3 text-center font-semibold text-gray-800">Progress</th>
-                                            <th className="border border-gray-200 px-4 py-3 text-center font-semibold text-gray-800">Completion</th>
-                                            <th className="border border-gray-200 px-4 py-3 text-center font-semibold text-gray-800">Time</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {scores.map((score, index) => (
-                                            <tr key={`${score.user_id}-${score.game_id}`} className={index < 3 ? 'bg-yellow-50' : 'hover:bg-gray-50'}>
-                                                <td className="border border-gray-200 px-4 py-3">
-                                                    <div className="flex items-center">
+                            <>
+                                {/* Desktop Table */}
+                                <div className="hidden lg:block overflow-x-auto">
+                                    <table className="w-full border-collapse border border-gray-200">
+                                        <thead>
+                                            <tr className="bg-gray-50">
+                                                <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-800">Rank</th>
+                                                <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-800">Player</th>
+                                                {selectedGameId === 'all' && (
+                                                    <th className="border border-gray-200 px-4 py-3 text-left font-semibold text-gray-800">Game</th>
+                                                )}
+                                                <th className="border border-gray-200 px-4 py-3 text-center font-semibold text-gray-800">Score</th>
+                                                <th className="border border-gray-200 px-4 py-3 text-center font-semibold text-gray-800">Progress</th>
+                                                <th className="border border-gray-200 px-4 py-3 text-center font-semibold text-gray-800">Completion</th>
+                                                <th className="border border-gray-200 px-4 py-3 text-center font-semibold text-gray-800">Time</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {scores.map((score, index) => (
+                                                <tr key={`${score.user_id}-${score.game_id}`} className={index < 3 ? 'bg-yellow-50' : 'hover:bg-gray-50'}>
+                                                    <td className="border border-gray-200 px-4 py-3">
+                                                        <div className="flex items-center">
+                                                            {index === 0 && '🥇'}
+                                                            {index === 1 && '🥈'}
+                                                            {index === 2 && '🥉'}
+                                                            {index > 2 && <span className="text-gray-600">#{index + 1}</span>}
+                                                        </div>
+                                                    </td>
+                                                    <td className="border border-gray-200 px-4 py-3">
+                                                        <div className="font-medium text-gray-900">
+                                                            {score.user_display_name || score.user_email || `User ${score.user_id.slice(0, 8)}...`}
+                                                        </div>
+                                                    </td>
+                                                    {selectedGameId === 'all' && (
+                                                        <td className="border border-gray-200 px-4 py-3">
+                                                            <div className="text-sm text-gray-600">
+                                                                {score.game_title}
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                    <td className="border border-gray-200 px-4 py-3 text-center">
+                                                        <div className="text-xl font-bold text-blue-600">
+                                                            {score.score}
+                                                        </div>
+                                                    </td>
+                                                    <td className="border border-gray-200 px-4 py-3 text-center">
+                                                        <div className="text-sm">
+                                                            {score.correct_answers}/{score.total_questions}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">
+                                                            {getCompletionPercentage(score)}%
+                                                        </div>
+                                                    </td>
+                                                    <td className="border border-gray-200 px-4 py-3 text-center">
+                                                        {score.is_completed ? (
+                                                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
+                                                                ✅ Complete
+                                                            </span>
+                                                        ) : (
+                                                            <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
+                                                                ⏳ In Progress
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="border border-gray-200 px-4 py-3 text-center text-sm text-gray-600">
+                                                        {formatTime(score.completion_time)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Mobile/Tablet Cards */}
+                                <div className="lg:hidden space-y-3">
+                                    {scores.map((score, index) => (
+                                        <div key={`${score.user_id}-${score.game_id}`}
+                                            className={`border rounded-lg p-4 ${index < 3 ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-200'}`}>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-2xl">
                                                         {index === 0 && '🥇'}
                                                         {index === 1 && '🥈'}
                                                         {index === 2 && '🥉'}
-                                                        {index > 2 && <span className="text-gray-600">#{index + 1}</span>}
+                                                        {index > 2 && <span className="text-lg text-gray-600">#{index + 1}</span>}
                                                     </div>
-                                                </td>
-                                                <td className="border border-gray-200 px-4 py-3">
-                                                    <div className="font-medium text-gray-900">
-                                                        {score.user_display_name || score.user_email || `User ${score.user_id.slice(0, 8)}...`}
-                                                    </div>
-                                                </td>
-                                                {selectedGameId === 'all' && (
-                                                    <td className="border border-gray-200 px-4 py-3">
-                                                        <div className="text-sm text-gray-600">
-                                                            {score.game_title}
+                                                    <div>
+                                                        <div className="font-semibold text-gray-900 text-sm">
+                                                            {score.user_display_name || score.user_email || `User ${score.user_id.slice(0, 8)}...`}
                                                         </div>
-                                                    </td>
-                                                )}
-                                                <td className="border border-gray-200 px-4 py-3 text-center">
+                                                        {selectedGameId === 'all' && (
+                                                            <div className="text-xs text-gray-500">
+                                                                {score.game_title}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
                                                     <div className="text-xl font-bold text-blue-600">
                                                         {score.score}
                                                     </div>
-                                                </td>
-                                                <td className="border border-gray-200 px-4 py-3 text-center">
-                                                    <div className="text-sm">
+                                                    <div className="text-xs text-gray-500">
+                                                        Score
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-3 text-center">
+                                                <div>
+                                                    <div className="text-sm font-medium">
                                                         {score.correct_answers}/{score.total_questions}
                                                     </div>
                                                     <div className="text-xs text-gray-500">
-                                                        {getCompletionPercentage(score)}%
+                                                        Progress ({getCompletionPercentage(score)}%)
                                                     </div>
-                                                </td>
-                                                <td className="border border-gray-200 px-4 py-3 text-center">
+                                                </div>
+                                                <div>
                                                     {score.is_completed ? (
                                                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">
-                                                            ✅ Complete
+                                                            ✅ Done
                                                         </span>
                                                     ) : (
                                                         <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
-                                                            ⏳ In Progress
+                                                            ⏳ Playing
                                                         </span>
                                                     )}
-                                                </td>
-                                                <td className="border border-gray-200 px-4 py-3 text-center text-sm text-gray-600">
-                                                    {formatTime(score.completion_time)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-medium">
+                                                        {formatTime(score.completion_time)}
+                                                    </div>
+                                                    <div className="text-xs text-gray-500">
+                                                        Time
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
                         )}
 
                         {/* No Scores */}
@@ -292,28 +362,28 @@ export default function Leaderboard() {
 
                         {/* Stats Summary */}
                         {scores.length > 0 && (
-                            <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                                    <div className="text-2xl font-bold text-blue-600">{scores.length}</div>
-                                    <div className="text-sm text-blue-800">Total Players</div>
+                            <div className="mt-6 sm:mt-8 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 text-center">
+                                    <div className="text-xl sm:text-2xl font-bold text-blue-600">{scores.length}</div>
+                                    <div className="text-xs sm:text-sm text-blue-800">Total Players</div>
                                 </div>
-                                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                                    <div className="text-2xl font-bold text-green-600">
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 text-center">
+                                    <div className="text-xl sm:text-2xl font-bold text-green-600">
                                         {scores.filter(s => s.is_completed).length}
                                     </div>
-                                    <div className="text-sm text-green-800">Completed</div>
+                                    <div className="text-xs sm:text-sm text-green-800">Completed</div>
                                 </div>
-                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                                    <div className="text-2xl font-bold text-yellow-600">
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 text-center">
+                                    <div className="text-xl sm:text-2xl font-bold text-yellow-600">
                                         {scores.length > 0 ? Math.max(...scores.map(s => s.score)) : 0}
                                     </div>
-                                    <div className="text-sm text-yellow-800">Highest Score</div>
+                                    <div className="text-xs sm:text-sm text-yellow-800">Highest Score</div>
                                 </div>
-                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-center">
-                                    <div className="text-2xl font-bold text-purple-600">
+                                <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 sm:p-4 text-center">
+                                    <div className="text-xl sm:text-2xl font-bold text-purple-600">
                                         {scores.length > 0 ? Math.round(scores.reduce((acc, s) => acc + s.score, 0) / scores.length) : 0}
                                     </div>
-                                    <div className="text-sm text-purple-800">Average Score</div>
+                                    <div className="text-xs sm:text-sm text-purple-800">Average Score</div>
                                 </div>
                             </div>
                         )}

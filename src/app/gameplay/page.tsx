@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 export default function Gameplay() {
     const { user, signOut } = useAuth();
     const scoreManagerRef = useRef<ScoreManagerRef>(null);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [crosswordData, setCrosswordData] = useState(() =>
         CrosswordManager.getInstance().getData()
     );
@@ -31,6 +32,24 @@ export default function Gameplay() {
     const [gameInfo, setGameInfo] = useState<{ title: string; description?: string } | null>(null);
     const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
     const [isAutoSaving, setIsAutoSaving] = useState(false);
+    const profileDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdown when clicking outside (support both mouse and touch)
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+            if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+                setIsProfileOpen(false);
+            }
+        };
+
+        // Add both mouse and touch event listeners for better mobile support
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, []);
 
     // Check admin status
     useEffect(() => {
@@ -441,46 +460,175 @@ export default function Gameplay() {
         <ProtectedRoute>
             <div className="min-h-screen bg-gray-100 p-4">
                 <div className="max-w-7xl mx-auto">
-                    {/* Header with user info */}
-                    <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-3xl font-bold text-black">Teka-Teki Silang</h1>
-                            {/* Auto-save indicator */}
+                    {/* Responsive Header */}
+                    <div className="bg-white rounded-lg shadow-sm mb-6 p-4">
+                        <div className="flex justify-between items-center">
+                            {/* Left: Title and Auto-save */}
+                            <div className="flex items-center gap-2 sm:gap-4">
+                                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-black">
+                                    <span className="hidden sm:inline">Teka-Teki Silang</span>
+                                    <span className="sm:hidden">TTS</span>
+                                </h1>
+                                {/* Auto-save indicator */}
+                                <AutoSaveIndicator
+                                    isActive={isAutoSaving && currentGameId !== null}
+                                    className="hidden sm:flex"
+                                />
+                            </div>
+
+                            {/* Right: Navigation */}
+                            <div className="flex items-center gap-2">
+                                {/* Mobile Menu - Hamburger */}
+                                <div className="sm:hidden relative" ref={profileDropdownRef}>
+                                    <button
+                                        onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors touch-manipulation"
+                                    >
+                                        <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                        </svg>
+                                    </button>
+
+                                    {/* Mobile Dropdown Menu */}
+                                    {isProfileOpen && (
+                                        <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-xl border z-[9999]">
+                                            <div className="p-4 border-b">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white text-lg font-semibold">
+                                                        {user?.user_metadata?.full_name ?
+                                                            user.user_metadata.full_name.charAt(0).toUpperCase() :
+                                                            user?.email ? user.email.charAt(0).toUpperCase() : 'P'
+                                                        }
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-semibold text-gray-900 truncate">
+                                                            {user?.user_metadata?.full_name || 'Player'}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 truncate">
+                                                            {user?.email}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="py-2">
+                                                <a
+                                                    href="/leaderboard"
+                                                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors touch-manipulation"
+                                                    onClick={() => setIsProfileOpen(false)}
+                                                >
+                                                    <span className="text-lg">🏆</span>
+                                                    <span className="text-sm text-gray-700">Leaderboard</span>
+                                                </a>
+                                                {isAdmin && (
+                                                    <a
+                                                        href="/admin"
+                                                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors touch-manipulation"
+                                                        onClick={() => setIsProfileOpen(false)}
+                                                    >
+                                                        <span className="text-lg">⚙️</span>
+                                                        <span className="text-sm text-gray-700">Admin Panel</span>
+                                                    </a>
+                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        signOut();
+                                                        setIsProfileOpen(false);
+                                                    }}
+                                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left touch-manipulation"
+                                                >
+                                                    <span className="text-lg">🚪</span>
+                                                    <span className="text-sm text-gray-700">Logout</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Desktop Navigation */}
+                                <div className="hidden sm:flex items-center gap-3">
+                                    <a
+                                        href="/leaderboard"
+                                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm transition-colors flex items-center gap-1"
+                                    >
+                                        <span className="text-sm">🏆</span>
+                                        <span className="hidden md:inline">Leaderboard</span>
+                                    </a>
+                                    {isAdmin && (
+                                        <a
+                                            href="/admin"
+                                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm transition-colors flex items-center gap-1"
+                                        >
+                                            <span className="text-sm">⚙️</span>
+                                            <span className="hidden md:inline">Admin</span>
+                                        </a>
+                                    )}
+
+                                    {/* Desktop Profile Dropdown */}
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => setIsProfileOpen(!isProfileOpen)}
+                                            className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors touch-manipulation"
+                                        >
+                                            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                                                {user?.user_metadata?.full_name ?
+                                                    user.user_metadata.full_name.charAt(0).toUpperCase() :
+                                                    user?.email ? user.email.charAt(0).toUpperCase() : 'P'
+                                                }
+                                            </div>
+                                            <span className="hidden lg:block text-sm text-gray-700 max-w-24 truncate">
+                                                {user?.user_metadata?.full_name || user?.email || 'Player'}
+                                            </span>
+                                            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+
+                                        {/* Desktop Dropdown Menu */}
+                                        {isProfileOpen && (
+                                            <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border z-50">
+                                                <div className="p-4 border-b">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white text-lg font-semibold">
+                                                            {user?.user_metadata?.full_name ?
+                                                                user.user_metadata.full_name.charAt(0).toUpperCase() :
+                                                                user?.email ? user.email.charAt(0).toUpperCase() : 'P'
+                                                            }
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-semibold text-gray-900 truncate">
+                                                                {user?.user_metadata?.full_name || 'Player'}
+                                                            </p>
+                                                            <p className="text-xs text-gray-500 truncate">
+                                                                {user?.email}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="py-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            signOut();
+                                                            setIsProfileOpen(false);
+                                                        }}
+                                                        className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-left touch-manipulation"
+                                                    >
+                                                        <span className="text-lg">🚪</span>
+                                                        <span className="text-sm text-gray-700">Logout</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Mobile Auto-save indicator */}
+                        <div className="sm:hidden mt-3">
                             <AutoSaveIndicator
                                 isActive={isAutoSaving && currentGameId !== null}
-                                className="hidden md:flex"
+                                className="justify-start"
                             />
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <div className="text-sm text-gray-600">
-                                {user ? (
-                                    `Welcome, ${user.user_metadata?.full_name || user.email || 'Player'}`
-                                ) : (
-                                    'Not authenticated'
-                                )}
-                            </div>
-                            {user && (
-                                <button
-                                    onClick={signOut}
-                                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm transition-colors"
-                                >
-                                    Logout
-                                </button>
-                            )}
-                            <a
-                                href="/leaderboard"
-                                className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded text-sm transition-colors"
-                            >
-                                🏆 Leaderboard
-                            </a>
-                            {isAdmin && (
-                                <a
-                                    href="/admin"
-                                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors"
-                                >
-                                    Admin
-                                </a>
-                            )}
                         </div>
                     </div>
 
@@ -563,14 +711,6 @@ export default function Gameplay() {
                                     }}
                                 />
                             )}
-
-                            {/* Auto-save indicator for mobile */}
-                            <div className="md:hidden">
-                                <AutoSaveIndicator
-                                    isActive={isAutoSaving && currentGameId !== null}
-                                    className="justify-center"
-                                />
-                            </div>
 
                             <ClueList
                                 questions={crosswordData.questions}
