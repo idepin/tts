@@ -18,11 +18,11 @@ export default function ScoreBoard({
 
     return (
         <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-            <h2 className="text-xl font-bold mb-4 text-center text-black">Skor & Progres</h2>
+            <h2 className="text-xl font-bold mb-4 text-center text-black">Score & Progres</h2>
 
             <div className="text-center mb-4">
                 <div className="text-3xl font-bold text-blue-600 mb-2">{score}</div>
-                <div className="text-sm text-gray-600">Poin</div>
+                <div className="text-sm text-gray-600">Score</div>
             </div>
 
             <div className="mb-4">
