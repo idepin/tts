@@ -542,6 +542,32 @@ export class CrosswordService {
         }
     }
 
+    // Update game title
+    static async updateGameTitle(gameId: string, newTitle: string): Promise<boolean> {
+        try {
+            console.log(`🔄 Updating game ${gameId} title to: ${newTitle}`);
+
+            const { error } = await supabase
+                .from('crossword_games')
+                .update({
+                    title: newTitle,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', gameId);
+
+            if (error) {
+                console.error('❌ Error updating game title:', error);
+                return false;
+            }
+
+            console.log(`✅ Game title updated successfully`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error in updateGameTitle:', error);
+            return false;
+        }
+    }
+
     // Delete game and its questions
     static async deleteGame(gameId: string): Promise<boolean> {
         try {

@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { CrosswordData } from '../../types/crossword';
 import { dummyCrosswordData } from '../../data/simpleCrosswordData';
 import { CrosswordManager } from '../../utils/CrosswordManager';
-import QuestionManager from '@/app/components/QuestionManager';
 import GameManager from '../components/GameManager';
+import EditGameModal from '../components/EditGameModal';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { CrosswordService } from '../../lib/crosswordService';
 
@@ -16,6 +16,7 @@ export default function Admin() {
     const [adminCheckLoading, setAdminCheckLoading] = useState(true);
     const [accessDenied, setAccessDenied] = useState(false);
     const [currentGameId, setCurrentGameId] = useState<string | null>(null);
+    const [showEditModal, setShowEditModal] = useState(false);
 
     // Check admin status
     useEffect(() => {
@@ -38,88 +39,12 @@ export default function Admin() {
         checkAdminStatus();
     }, []);
 
-    // Load data when game is selected
-    useEffect(() => {
-        if (currentGameId) {
-            loadGameData(currentGameId);
+    // Handle game selection for editing
+    const handleGameSelect = (gameId: string | null) => {
+        setCurrentGameId(gameId);
+        if (gameId) {
+            setShowEditModal(true);
         }
-    }, [currentGameId]);
-
-    const loadGameData = async (gameId: string) => {
-        try {
-            console.log('🔍 Loading data for game:', gameId);
-            const gameData = await CrosswordService.getGameById(gameId);
-            if (gameData) {
-                console.log('✅ Loaded game:', gameData.game.title, 'with', gameData.questions.length, 'questions');
-                const newCrosswordData = {
-                    questions: gameData.questions,
-                    grid: generateGridFromQuestions(gameData.questions, { rows: 10, cols: 10 })
-                };
-                setCrosswordData(newCrosswordData);
-            } else {
-                console.log('❌ Failed to load game data');
-                // Reset to empty if game not found
-                setCrosswordData({ questions: [], grid: [] });
-            }
-        } catch (error) {
-            console.error('❌ Error loading game data:', error);
-            setCrosswordData({ questions: [], grid: [] });
-        }
-    };
-
-    // Helper function to generate grid from questions
-    const generateGridFromQuestions = (questions: any[], gridSize: { rows: number; cols: number }) => {
-        const grid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(null));
-        questions.forEach(question => {
-            for (let i = 0; i < question.answer.length; i++) {
-                const row = question.direction === 'horizontal' ? question.startRow : question.startRow + i;
-                const col = question.direction === 'horizontal' ? question.startCol + i : question.startCol;
-                if (row >= 0 && row < gridSize.rows && col >= 0 && col < gridSize.cols) {
-                    grid[row][col] = question.answer[i];
-                }
-            }
-        });
-        return grid;
-    };
-
-    const handleReset = () => {
-        if (confirm('Yakin ingin reset ke data default?')) {
-            const manager = CrosswordManager.getInstance();
-            manager.resetToDefault();
-            setCrosswordData(manager.getData());
-        }
-    };
-
-    const handleExport = () => {
-        const manager = CrosswordManager.getInstance();
-        const dataStr = manager.exportData();
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'crossword-data.json';
-        link.click();
-        URL.revokeObjectURL(url);
-    };
-
-    const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const content = e.target?.result as string;
-                const manager = CrosswordManager.getInstance();
-                if (manager.importData(content)) {
-                    setCrosswordData(manager.getData());
-                    alert('Data berhasil diimpor!');
-                } else {
-                    alert('Error: Format file tidak valid!');
-                }
-            };
-            reader.readAsText(file);
-        }
-        // Reset input
-        event.target.value = '';
     };
 
     // Show loading while checking admin status
@@ -190,62 +115,34 @@ export default function Admin() {
 
                         {/* Game Management */}
                         <GameManager
-                            onGameSelect={setCurrentGameId}
+                            onGameSelect={handleGameSelect}
                             currentGameId={currentGameId}
                         />
 
-                        {/* Action Buttons */}
-                        <div className="flex flex-wrap gap-4 justify-center mb-6 mt-6">
-                            <button
-                                onClick={handleExport}
-                                className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded transition-colors"
-                            >
-                                📤 Export JSON
-                            </button>
-                            <label className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-2 rounded transition-colors cursor-pointer">
-                                📥 Import JSON
-                                <input
-                                    type="file"
-                                    accept=".json"
-                                    onChange={handleImport}
-                                    className="hidden"
-                                />
-                            </label>
-                            <button
-                                onClick={handleReset}
-                                className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded transition-colors"
-                            >
-                                🔄 Reset Default
-                            </button>
-                        </div>
-
-                        {/* Question Management - Only show when a game is selected */}
-                        {currentGameId && (
-                            <div className="mt-8 pt-6 border-t border-gray-200">
-                                <h3 className="text-xl font-semibold mb-4 text-black">
-                                    📝 Question Manager
-                                </h3>
-                                <QuestionManager
-                                    crosswordData={crosswordData}
-                                    currentGameId={currentGameId}
-                                    onUpdate={(newData: CrosswordData) => {
-                                        setCrosswordData(newData);
-                                        CrosswordManager.getInstance().updateData(newData);
-                                    }}
-                                />
-                            </div>
+                        {/* Edit Game Modal */}
+                        {showEditModal && currentGameId && (
+                            <EditGameModal
+                                gameId={currentGameId}
+                                onClose={() => {
+                                    setShowEditModal(false);
+                                    setCurrentGameId(null);
+                                }}
+                                onGameUpdated={() => {
+                                    // Optional: refresh games list or show success message
+                                    console.log('Game updated successfully');
+                                }}
+                            />
                         )}
 
                         {/* Help Text */}
-                        {!currentGameId && (
-                            <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg text-center">
-                                <div className="text-blue-400 text-4xl mb-2">🎮</div>
-                                <h4 className="text-lg font-semibold text-blue-900 mb-2">Select or Create a Game</h4>
-                                <p className="text-blue-700">
-                                    Create a new game or select an existing game above to start managing questions.
-                                </p>
-                            </div>
-                        )}
+                        <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                            <div className="text-blue-400 text-4xl mb-2">🎮</div>
+                            <h4 className="text-lg font-semibold text-blue-900 mb-2">Game Management Made Easy</h4>
+                            <p className="text-blue-700">
+                                Create new crossword games or select an existing game to edit its questions.
+                                Click <strong>"✏️ Edit"</strong> on any game to open the question editor in a clean popup window.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>

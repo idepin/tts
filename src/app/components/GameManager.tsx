@@ -133,8 +133,8 @@ export default function GameManager({ onGameSelect, currentGameId }: GameManager
 
                 {message && (
                     <div className={`mb-4 p-3 rounded ${message.includes('✅') ? 'bg-green-100 text-green-800' :
-                            message.includes('❌') ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'
+                        message.includes('❌') ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
                         }`}>
                         {message}
                     </div>
@@ -232,8 +232,8 @@ export default function GameManager({ onGameSelect, currentGameId }: GameManager
                             <div
                                 key={game.id}
                                 className={`border rounded-lg p-4 ${game.is_active
-                                        ? 'bg-green-50 border-green-200'
-                                        : 'bg-white border-gray-200'
+                                    ? 'bg-green-50 border-green-200'
+                                    : 'bg-white border-gray-200'
                                     } ${currentGameId === game.id
                                         ? 'ring-2 ring-blue-500'
                                         : ''
@@ -250,7 +250,7 @@ export default function GameManager({ onGameSelect, currentGameId }: GameManager
                                             )}
                                             {currentGameId === game.id && (
                                                 <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
-                                                    📝 Editing
+                                                    📝 Selected
                                                 </span>
                                             )}
                                         </div>
@@ -267,13 +267,9 @@ export default function GameManager({ onGameSelect, currentGameId }: GameManager
                                     <div className="flex flex-col gap-2 ml-4">
                                         <button
                                             onClick={() => onGameSelect(game.id)}
-                                            className={`px-3 py-1 rounded text-sm ${currentGameId === game.id
-                                                    ? 'bg-blue-100 text-blue-800 cursor-default'
-                                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                                }`}
-                                            disabled={currentGameId === game.id}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
                                         >
-                                            {currentGameId === game.id ? '📝 Editing' : '✏️ Edit'}
+                                            ✏️ Edit
                                         </button>
 
                                         {!game.is_active && (
