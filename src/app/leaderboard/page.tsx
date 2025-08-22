@@ -68,7 +68,7 @@ export default function Leaderboard() {
                     console.log(`🔍 Loading scores for game: ${game.title} (${game.id})`);
                     const gameScores = await CrosswordService.getGameLeaderboard(game.id, 50);
                     console.log(`✅ Got ${gameScores.length} scores for ${game.title}`);
-                    
+
                     // Add game title to each score
                     const scoresWithGameTitle = gameScores.map(score => ({
                         ...score,
@@ -84,7 +84,7 @@ export default function Leaderboard() {
                 console.log(`🎯 Loading scores for specific game: ${selectedGameId}`);
                 allScores = await CrosswordService.getGameLeaderboard(selectedGameId, 50);
                 console.log(`✅ Got ${allScores.length} scores for selected game`);
-                
+
                 const selectedGame = games.find(g => g.id === selectedGameId);
                 allScores = allScores.map(score => ({
                     ...score,
@@ -94,7 +94,7 @@ export default function Leaderboard() {
 
             setScores(allScores);
             console.log('✅ Final leaderboard loaded:', allScores.length, 'total scores');
-            
+
             if (allScores.length === 0) {
                 console.warn('⚠️ No scores found! This could indicate:');
                 console.warn('  1. No one has played yet');

@@ -800,7 +800,7 @@ export class CrosswordService {
     static async getGameLeaderboard(gameId: string, limit: number = 10): Promise<PlayerScore[]> {
         try {
             console.log('🔍 Getting public leaderboard for game:', gameId, 'limit:', limit);
-            
+
             // Try direct query first
             const { data: scores, error } = await supabase
                 .from('player_scores')
@@ -813,7 +813,7 @@ export class CrosswordService {
             if (error) {
                 console.error('❌ Direct leaderboard query failed:', error);
                 console.error('❌ This is likely due to RLS policy restricting access');
-                
+
                 // Try alternative method using RPC
                 console.log('🔄 Attempting RPC method for public leaderboard...');
                 return await this.getPublicLeaderboardRPC(gameId, limit);
@@ -838,7 +838,7 @@ export class CrosswordService {
     static async getPublicLeaderboardRPC(gameId: string, limit: number = 10): Promise<PlayerScore[]> {
         try {
             console.log('🔄 Using RPC for public leaderboard access');
-            
+
             const { data: scores, error } = await supabase
                 .rpc('get_public_leaderboard', {
                     p_game_id: gameId,
@@ -863,7 +863,7 @@ export class CrosswordService {
     static async getLeaderboardAdminOverride(gameId: string, limit: number = 10): Promise<PlayerScore[]> {
         try {
             console.log('🔄 Using admin override for public leaderboard');
-            
+
             // This would require service role key, but we'll simulate with current permissions
             // In production, you'd use supabase service client here
             const { data: scores, error } = await supabase
@@ -893,7 +893,7 @@ export class CrosswordService {
             }
 
             console.log('✅ Retrieved leaderboard via admin override:', scores?.length || 0, 'scores');
-            
+
             const scoresWithDisplayNames = (scores || []).map(score => ({
                 ...score,
                 user_display_name: score.user_display_name || `User ${score.user_id.slice(0, 8)}...`

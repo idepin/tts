@@ -209,8 +209,8 @@ export default function Gameplay() {
     const handleCellClick = (row: number, col: number) => {
         if (crosswordData.grid[row][col] === null) return;
 
-        // Don't allow clicking on cells that are already correct
-        if (isCellCorrect(row, col)) return;
+        // Don't allow clicking on cells that are in completed questions
+        if (isCellInCompletedQuestion(row, col)) return;
 
         // Set focused cell
         setFocusedCell({ row, col });
@@ -342,11 +342,11 @@ export default function Gameplay() {
             let nextCol = col;
 
             if (activeQuestion.direction === 'horizontal') {
-                // Find the next available (not correct) cell
+                // Find the next available (not in completed question) cell
                 for (let i = col + 1; i < activeQuestion.startCol + activeQuestion.answer.length; i++) {
                     if (i < crosswordData.grid[0].length &&
                         crosswordData.grid[nextRow][i] !== null &&
-                        !isCellCorrect(nextRow, i)) {
+                        !isCellInCompletedQuestion(nextRow, i)) {
                         nextCol = i;
                         break;
                     }
@@ -362,11 +362,11 @@ export default function Gameplay() {
                     }, 10);
                 }
             } else {
-                // Find the next available (not correct) cell
+                // Find the next available (not in completed question) cell
                 for (let i = row + 1; i < activeQuestion.startRow + activeQuestion.answer.length; i++) {
                     if (i < crosswordData.grid.length &&
                         crosswordData.grid[i][nextCol] !== null &&
-                        !isCellCorrect(i, nextCol)) {
+                        !isCellInCompletedQuestion(i, nextCol)) {
                         nextRow = i;
                         break;
                     }
@@ -391,7 +391,12 @@ export default function Gameplay() {
     const handleQuestionClick = (question: Question) => {
         setActiveQuestion(question);
 
-        // Find the first cell in this question that is not correct yet
+        // Don't focus on completed questions
+        if (gameState.completedQuestions.includes(question.id)) {
+            return;
+        }
+
+        // Find the first cell in this question that is not in a completed question
         let targetRow = question.startRow;
         let targetCol = question.startCol;
 
@@ -399,7 +404,7 @@ export default function Gameplay() {
             const row = question.direction === 'horizontal' ? question.startRow : question.startRow + i;
             const col = question.direction === 'horizontal' ? question.startCol + i : question.startCol;
 
-            if (!isCellCorrect(row, col)) {
+            if (!isCellInCompletedQuestion(row, col)) {
                 targetRow = row;
                 targetCol = col;
                 break;
@@ -467,6 +472,26 @@ export default function Gameplay() {
                 }
             }
             return false;
+        });
+    };
+
+    // Check if this cell is in a completed question (should be readonly)
+    const isCellInCompletedQuestion = (row: number, col: number): boolean => {
+        return crosswordData.questions.some(question => {
+            // Check if this question is completed
+            const isQuestionCompleted = gameState.completedQuestions.includes(question.id);
+            if (!isQuestionCompleted) return false;
+
+            // Check if this cell is part of this completed question
+            if (question.direction === 'horizontal') {
+                return row === question.startRow &&
+                    col >= question.startCol &&
+                    col < question.startCol + question.answer.length;
+            } else {
+                return col === question.startCol &&
+                    row >= question.startRow &&
+                    row < question.startRow + question.answer.length;
+            }
         });
     };
 
@@ -694,6 +719,7 @@ export default function Gameplay() {
                                                 }
                                             });
                                             const cellIsCorrect = isCellCorrect(rowIndex, colIndex);
+                                            const cellInCompletedQuestion = isCellInCompletedQuestion(rowIndex, colIndex);
 
                                             return (
                                                 <WordBox
@@ -707,7 +733,7 @@ export default function Gameplay() {
                                                     onClick={() => handleCellClick(rowIndex, colIndex)}
                                                     onInputChange={(value) => handleInputChange(rowIndex, colIndex, value)}
                                                     onKeyDown={(e) => handleKeyDown(rowIndex, colIndex, e)}
-                                                    readOnly={cellIsCorrect}
+                                                    readOnly={cellInCompletedQuestion}
                                                     focused={isFocused}
                                                 />
                                             );
