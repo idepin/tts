@@ -32,18 +32,6 @@ export default function Auth() {
     return (
         <div>
             <LoginForm />
-
-            {/* Debug Link - hanya untuk development */}
-            {process.env.NODE_ENV === 'development' && (
-                <div className="fixed bottom-4 right-4">
-                    <a
-                        href="/auth/test"
-                        className="text-xs bg-gray-800 hover:bg-gray-700 text-white px-3 py-2 rounded-lg shadow-lg"
-                    >
-                        🔧 Test Connection
-                    </a>
-                </div>
-            )}
         </div>
     );
 }

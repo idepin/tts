@@ -455,28 +455,16 @@ export default function Gameplay() {
                             <div className="text-sm text-gray-600">
                                 {user ? (
                                     `Welcome, ${user.email || user.user_metadata?.full_name || 'Player'}`
-                                ) : process.env.NODE_ENV === 'development' ? (
-                                    'Development Mode'
                                 ) : (
                                     'Not authenticated'
                                 )}
                             </div>
-                            {user ? (
+                            {user && (
                                 <button
                                     onClick={signOut}
                                     className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm transition-colors"
                                 >
                                     Logout
-                                </button>
-                            ) : process.env.NODE_ENV === 'development' && (
-                                <button
-                                    onClick={() => {
-                                        localStorage.removeItem('dev-bypass-auth');
-                                        window.location.href = '/auth';
-                                    }}
-                                    className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm transition-colors"
-                                >
-                                    Go to Login
                                 </button>
                             )}
                             <a

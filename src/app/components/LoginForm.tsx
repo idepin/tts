@@ -117,49 +117,6 @@ export default function LoginForm() {
                         magicLink={false}
                         view="sign_in"
                     />
-
-                    <div className="mt-8 text-center">
-                        <p className="text-sm text-gray-600 mb-4">
-                            Belum punya akun? Daftar akan otomatis dibuat saat login pertama kali.
-                        </p>
-
-                        {/* Development bypass button */}
-                        {process.env.NODE_ENV === 'development' && (
-                            <div className="border-t pt-4">
-                                <p className="text-xs text-gray-500 mb-2">Development Mode</p>
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            // Create a test session for development
-                                            const { data, error } = await supabase.auth.signInWithPassword({
-                                                email: 'dev@test.com',
-                                                password: 'dev123456'
-                                            });
-
-                                            if (error) {
-                                                // If user doesn't exist, create it
-                                                const { error: signUpError } = await supabase.auth.signUp({
-                                                    email: 'dev@test.com',
-                                                    password: 'dev123456'
-                                                });
-
-                                                if (!signUpError) {
-                                                    alert('Dev account created! Please check email to confirm, or try login again.');
-                                                } else {
-                                                    console.error('Dev bypass error:', signUpError);
-                                                }
-                                            }
-                                        } catch (err) {
-                                            console.error('Dev bypass error:', err);
-                                        }
-                                    }}
-                                    className="text-xs bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded"
-                                >
-                                    Dev Login (dev@test.com)
-                                </button>
-                            </div>
-                        )}
-                    </div>
                 </div>
             </div>
         </div>

@@ -1,7 +1,7 @@
 'use client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -10,21 +10,12 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     const { user, loading } = useAuth();
     const router = useRouter();
-    const [devBypass, setDevBypass] = useState(false);
 
     useEffect(() => {
-        // Check for development bypass
-        if (process.env.NODE_ENV === 'development') {
-            const bypass = localStorage.getItem('dev-bypass-auth') === 'true';
-            setDevBypass(bypass);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (!loading && !user && !devBypass) {
+        if (!loading && !user) {
             router.push('/auth');
         }
-    }, [user, loading, router, devBypass]);
+    }, [user, loading, router]);
 
     // Show loading spinner while checking authentication
     if (loading) {
@@ -38,11 +29,11 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         );
     }
 
-    // Show nothing if not authenticated and no dev bypass (will redirect)
-    if (!user && !devBypass) {
+    // Show nothing if not authenticated (will redirect)
+    if (!user) {
         return null;
     }
 
-    // Show protected content if authenticated or dev bypass
+    // Show protected content if authenticated
     return <>{children}</>;
 }

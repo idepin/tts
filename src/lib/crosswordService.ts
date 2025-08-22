@@ -51,17 +51,6 @@ export class CrosswordService {
             }
 
             if (!user.user) {
-                // In development, provide more helpful guidance
-                if (process.env.NODE_ENV === 'development') {
-                    return {
-                        success: false,
-                        message: 'Not authenticated - Go to /auth to login first. For testing, you can also run createTestUser() in console.',
-                        details: {
-                            suggestion: 'Run: await supabase.auth.signInAnonymously() for testing',
-                            loginUrl: '/auth'
-                        }
-                    };
-                }
                 return { success: false, message: 'Not authenticated - please login first' };
             }
 
