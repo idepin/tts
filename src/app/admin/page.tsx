@@ -3,14 +3,12 @@ import React, { useState } from 'react';
 import { CrosswordData } from '../../types/crossword';
 import { dummyCrosswordData } from '../../data/simpleCrosswordData';
 import { CrosswordManager } from '../../utils/CrosswordManager';
-import GridEditor from '../components/GridEditor';
 import QuestionManager from '../components/QuestionManager';
 
 export default function Admin() {
     const [crosswordData, setCrosswordData] = useState<CrosswordData>(() =>
         CrosswordManager.getInstance().getData()
     );
-    const [activeTab, setActiveTab] = useState<'grid' | 'questions'>('questions');
 
     const handleSave = () => {
         // Save to localStorage
@@ -114,48 +112,14 @@ export default function Admin() {
                         </a>
                     </div>
 
-                    {/* Tab Navigation */}
-                    <div className="flex border-b mb-6">
-                        <button
-                            onClick={() => setActiveTab('questions')}
-                            className={`px-6 py-3 font-semibold ${activeTab === 'questions'
-                                    ? 'border-b-2 border-blue-500 text-blue-600'
-                                    : 'text-black hover:text-gray-800'
-                                }`}
-                        >
-                            📝 Kelola Pertanyaan
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('grid')}
-                            className={`px-6 py-3 font-semibold ${activeTab === 'grid'
-                                    ? 'border-b-2 border-blue-500 text-blue-600'
-                                    : 'text-black hover:text-gray-800'
-                                }`}
-                        >
-                            🎯 Editor Grid
-                        </button>
-                    </div>
-
-                    {/* Tab Content */}
-                    {activeTab === 'questions' && (
-                        <QuestionManager
-                            crosswordData={crosswordData}
-                            onUpdate={(newData: CrosswordData) => {
-                                setCrosswordData(newData);
-                                CrosswordManager.getInstance().updateData(newData);
-                            }}
-                        />
-                    )}
-
-                    {activeTab === 'grid' && (
-                        <GridEditor
-                            crosswordData={crosswordData}
-                            onUpdate={(newData: CrosswordData) => {
-                                setCrosswordData(newData);
-                                CrosswordManager.getInstance().updateData(newData);
-                            }}
-                        />
-                    )}
+                    {/* Content */}
+                    <QuestionManager
+                        crosswordData={crosswordData}
+                        onUpdate={(newData: CrosswordData) => {
+                            setCrosswordData(newData);
+                            CrosswordManager.getInstance().updateData(newData);
+                        }}
+                    />
                 </div>
             </div>
         </div>

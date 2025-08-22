@@ -2,6 +2,27 @@
 import React, { useState } from 'react';
 import { CrosswordData, Question } from '../../types/crossword';
 
+// Helper function to generate grid from questions
+const generateGridFromQuestions = (questions: Question[], gridSize: { rows: number; cols: number }): (string | null)[][] => {
+    // Initialize empty grid
+    const grid: (string | null)[][] = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(null));
+
+    // Fill grid with answers from questions
+    questions.forEach(question => {
+        for (let i = 0; i < question.answer.length; i++) {
+            const row = question.direction === 'horizontal' ? question.startRow : question.startRow + i;
+            const col = question.direction === 'horizontal' ? question.startCol + i : question.startCol;
+
+            // Check bounds
+            if (row >= 0 && row < gridSize.rows && col >= 0 && col < gridSize.cols) {
+                grid[row][col] = question.answer[i];
+            }
+        }
+    });
+
+    return grid;
+};
+
 interface QuestionManagerProps {
     crosswordData: CrosswordData;
     onUpdate: (data: CrosswordData) => void;
@@ -16,6 +37,7 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
         startRow: 1,
         startCol: 1
     });
+    const [gridSize, setGridSize] = useState({ rows: 10, cols: 10 });
 
     const handleEditQuestion = (index: number) => {
         const question = crosswordData.questions[index];
@@ -88,7 +110,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
 
         onUpdate({
             ...crosswordData,
-            questions: updatedQuestions
+            questions: updatedQuestions,
+            grid: generateGridFromQuestions(updatedQuestions, gridSize)
         });
 
         // Reset form
@@ -107,7 +130,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
             const updatedQuestions = crosswordData.questions.filter((_, i) => i !== index);
             onUpdate({
                 ...crosswordData,
-                questions: updatedQuestions
+                questions: updatedQuestions,
+                grid: generateGridFromQuestions(updatedQuestions, gridSize)
             });
         }
     };
@@ -125,6 +149,73 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
 
     return (
         <div className="space-y-6">
+            {/* Grid Preview */}
+            <div>
+                <h3 className="text-lg font-semibold mb-4 text-black">Preview Grid Auto-Generated</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-2">
+                            Grid otomatis ter-update berdasarkan pertanyaan dan posisinya.
+                            Ukuran grid saat ini: {gridSize.rows}x{gridSize.cols}
+                        </p>
+                        <div className="flex gap-4 items-center">
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-medium text-black">Baris:</label>
+                                <input
+                                    type="number"
+                                    min="5"
+                                    max="20"
+                                    value={gridSize.rows}
+                                    onChange={(e) => {
+                                        const newSize = { ...gridSize, rows: parseInt(e.target.value) || 10 };
+                                        setGridSize(newSize);
+                                        onUpdate({
+                                            ...crosswordData,
+                                            grid: generateGridFromQuestions(crosswordData.questions, newSize)
+                                        });
+                                    }}
+                                    className="w-16 border rounded px-2 py-1 text-black"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="text-sm font-medium text-black">Kolom:</label>
+                                <input
+                                    type="number"
+                                    min="5"
+                                    max="20"
+                                    value={gridSize.cols}
+                                    onChange={(e) => {
+                                        const newSize = { ...gridSize, cols: parseInt(e.target.value) || 10 };
+                                        setGridSize(newSize);
+                                        onUpdate({
+                                            ...crosswordData,
+                                            grid: generateGridFromQuestions(crosswordData.questions, newSize)
+                                        });
+                                    }}
+                                    className="w-16 border rounded px-2 py-1 text-black"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-px bg-gray-300 p-2 rounded w-fit mx-auto overflow-auto max-w-full"
+                        style={{ gridTemplateColumns: `repeat(${gridSize.cols}, minmax(0, 1fr))` }}>
+                        {generateGridFromQuestions(crosswordData.questions, gridSize).map((row, rowIndex) =>
+                            row.map((cell, colIndex) => (
+                                <div
+                                    key={`${rowIndex}-${colIndex}`}
+                                    className={`
+                                        w-6 h-6 flex items-center justify-center text-xs font-bold border
+                                        ${cell ? 'bg-white text-black' : 'bg-gray-800'}
+                                    `}
+                                >
+                                    {cell || ''}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
             <div className="bg-gray-50 p-4 rounded-lg">
                 <h3 className="text-lg font-semibold mb-2 text-black">
                     {editingIndex !== null ? 'Edit Pertanyaan' : 'Tambah Pertanyaan Baru'}
@@ -274,6 +365,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                     ))}
                 </div>
             </div>
+
+
         </div>
     );
 }

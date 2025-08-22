@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import WordBox from '../components/WordBox';
 import ClueList from '../components/ClueList';
 import ScoreBoard from '../components/ScoreBoard';
-import QuestionEditor from '../components/QuestionEditor';
 import { Question, GameState } from '../../types/crossword';
 import { calculateScore } from '../../data/simpleCrosswordData';
 import { CrosswordManager } from '../../utils/CrosswordManager';
@@ -180,16 +179,6 @@ export default function Gameplay() {
         setFocusedCell(null);
     };
 
-    const handleUpdateQuestions = (newQuestions: Question[]) => {
-        const updatedData = {
-            ...crosswordData,
-            questions: newQuestions
-        };
-        setCrosswordData(updatedData);
-        CrosswordManager.getInstance().updateData(updatedData);
-        handleReset(); // Reset game when questions are updated
-    };
-
     const isNumberedCell = (row: number, col: number): { isNumbered: boolean; number?: number } => {
         // Find questions that start at this position
         const questionsAtPosition = crosswordData.questions.filter(q =>
@@ -291,11 +280,6 @@ export default function Gameplay() {
                             completedQuestions={gameState.completedQuestions}
                             onQuestionClick={handleQuestionClick}
                             activeQuestionId={activeQuestion?.id}
-                        />
-
-                        <QuestionEditor
-                            questions={crosswordData.questions}
-                            onUpdateQuestions={handleUpdateQuestions}
                         />
                     </div>
                 </div>
