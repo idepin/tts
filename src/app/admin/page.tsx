@@ -10,19 +10,6 @@ export default function Admin() {
         CrosswordManager.getInstance().getData()
     );
 
-    const handleSave = () => {
-        // Save to localStorage
-        const manager = CrosswordManager.getInstance();
-        manager.updateData(crosswordData);
-        alert('Data berhasil disimpan!');
-    };
-
-    const handleLoad = () => {
-        const manager = CrosswordManager.getInstance();
-        setCrosswordData(manager.getData());
-        alert('Data berhasil dimuat!');
-    };
-
     const handleReset = () => {
         if (confirm('Yakin ingin reset ke data default?')) {
             const manager = CrosswordManager.getInstance();
@@ -71,18 +58,6 @@ export default function Admin() {
 
                     {/* Action Buttons */}
                     <div className="flex flex-wrap gap-4 justify-center mb-6">
-                        <button
-                            onClick={handleSave}
-                            className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded transition-colors"
-                        >
-                            💾 Simpan Data
-                        </button>
-                        <button
-                            onClick={handleLoad}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded transition-colors"
-                        >
-                            📂 Muat Data
-                        </button>
                         <button
                             onClick={handleExport}
                             className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded transition-colors"
