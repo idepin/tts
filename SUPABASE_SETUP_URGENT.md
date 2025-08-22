@@ -1,4 +1,45 @@
-# SETUP DATABASE SUPABASE - LANGKAH DEMI LANGKAH
+# ⚠️ URGENT: Setup Admin System - Save to Supabase Gagal!
+
+## Status Masalah Saat Ini:
+- ❌ Save to Supabase gagal meskipun user login
+- ❌ Email di setup-admin-system.sql masih `'your-email@example.com'` 
+- ❌ User belum di-set sebagai admin di database
+- ❌ SQL setup belum dijalankan
+
+## SOLUSI CEPAT - Ikuti Langkah Ini:
+
+### 1. ⚠️ PENTING: Ganti Email di setup-admin-system.sql
+**File**: `setup-admin-system.sql` **Line 95**
+
+```sql
+-- GANTI DARI:
+WHERE email = 'your-email@example.com'  -- GANTI INI!
+
+-- MENJADI (gunakan email yang Anda pakai login):
+WHERE email = 'ervin@example.com'  -- Ganti dengan email Anda!
+```
+
+### 2. Jalankan SQL di Supabase Dashboard
+1. Login ke [Supabase Dashboard](https://supabase.com/dashboard)
+2. Pilih project Anda  
+3. Klik **SQL Editor** di sidebar
+4. Copy SELURUH isi file `setup-admin-system.sql`
+5. Paste dan klik **Run**
+
+### 3. Verifikasi Setup Berhasil
+Output harus menunjukkan:
+```
+email               | role  | created_at
+your-email@xxx.com  | admin | 2025-08-22 10:30:00
+```
+
+### 4. Test di Aplikasi
+1. Refresh halaman aplikasi
+2. Status harus muncul "👑 Admin" 
+3. Button "💾 Save to Supabase" harus enabled
+4. Klik "🔧 Test Database" untuk cek koneksi
+
+---
 
 ## 🚨 Apakah RLS Policies Wajib?
 

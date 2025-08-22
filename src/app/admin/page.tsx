@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { CrosswordData } from '../../types/crossword';
 import { dummyCrosswordData } from '../../data/simpleCrosswordData';
 import { CrosswordManager } from '../../utils/CrosswordManager';
-import QuestionManager from '../components/QuestionManager';
+import QuestionManager from '@/app/components/QuestionManager';
+import GameManager from '../components/GameManager';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { CrosswordService } from '../../lib/crosswordService';
 
@@ -14,6 +15,7 @@ export default function Admin() {
     const [isAdmin, setIsAdmin] = useState(false);
     const [adminCheckLoading, setAdminCheckLoading] = useState(true);
     const [accessDenied, setAccessDenied] = useState(false);
+    const [currentGameId, setCurrentGameId] = useState<string | null>(null);
 
     // Check admin status
     useEffect(() => {
@@ -35,6 +37,50 @@ export default function Admin() {
 
         checkAdminStatus();
     }, []);
+
+    // Load data when game is selected
+    useEffect(() => {
+        if (currentGameId) {
+            loadGameData(currentGameId);
+        }
+    }, [currentGameId]);
+
+    const loadGameData = async (gameId: string) => {
+        try {
+            console.log('🔍 Loading data for game:', gameId);
+            const gameData = await CrosswordService.getGameById(gameId);
+            if (gameData) {
+                console.log('✅ Loaded game:', gameData.game.title, 'with', gameData.questions.length, 'questions');
+                const newCrosswordData = {
+                    questions: gameData.questions,
+                    grid: generateGridFromQuestions(gameData.questions, { rows: 10, cols: 10 })
+                };
+                setCrosswordData(newCrosswordData);
+            } else {
+                console.log('❌ Failed to load game data');
+                // Reset to empty if game not found
+                setCrosswordData({ questions: [], grid: [] });
+            }
+        } catch (error) {
+            console.error('❌ Error loading game data:', error);
+            setCrosswordData({ questions: [], grid: [] });
+        }
+    };
+
+    // Helper function to generate grid from questions
+    const generateGridFromQuestions = (questions: any[], gridSize: { rows: number; cols: number }) => {
+        const grid = Array(gridSize.rows).fill(null).map(() => Array(gridSize.cols).fill(null));
+        questions.forEach(question => {
+            for (let i = 0; i < question.answer.length; i++) {
+                const row = question.direction === 'horizontal' ? question.startRow : question.startRow + i;
+                const col = question.direction === 'horizontal' ? question.startCol + i : question.startCol;
+                if (row >= 0 && row < gridSize.rows && col >= 0 && col < gridSize.cols) {
+                    grid[row][col] = question.answer[i];
+                }
+            }
+        });
+        return grid;
+    };
 
     const handleReset = () => {
         if (confirm('Yakin ingin reset ke data default?')) {
@@ -104,7 +150,7 @@ export default function Admin() {
                         <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-6 text-left">
                             <p className="text-sm text-yellow-800">
                                 <strong>Need admin access?</strong><br />
-                                Run the <code className="bg-yellow-100 px-1 rounded">setup-admin-system.sql</code> file 
+                                Run the <code className="bg-yellow-100 px-1 rounded">setup-admin-system.sql</code> file
                                 and update the email address in the script to grant yourself admin privileges.
                             </p>
                         </div>
@@ -140,8 +186,16 @@ export default function Admin() {
                             </div>
                         </div>
 
+
+
+                        {/* Game Management */}
+                        <GameManager
+                            onGameSelect={setCurrentGameId}
+                            currentGameId={currentGameId}
+                        />
+
                         {/* Action Buttons */}
-                        <div className="flex flex-wrap gap-4 justify-center mb-6">
+                        <div className="flex flex-wrap gap-4 justify-center mb-6 mt-6">
                             <button
                                 onClick={handleExport}
                                 className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded transition-colors"
@@ -165,14 +219,33 @@ export default function Admin() {
                             </button>
                         </div>
 
-                        {/* Content */}
-                        <QuestionManager
-                            crosswordData={crosswordData}
-                            onUpdate={(newData: CrosswordData) => {
-                                setCrosswordData(newData);
-                                CrosswordManager.getInstance().updateData(newData);
-                            }}
-                        />
+                        {/* Question Management - Only show when a game is selected */}
+                        {currentGameId && (
+                            <div className="mt-8 pt-6 border-t border-gray-200">
+                                <h3 className="text-xl font-semibold mb-4 text-black">
+                                    📝 Question Manager
+                                </h3>
+                                <QuestionManager
+                                    crosswordData={crosswordData}
+                                    currentGameId={currentGameId}
+                                    onUpdate={(newData: CrosswordData) => {
+                                        setCrosswordData(newData);
+                                        CrosswordManager.getInstance().updateData(newData);
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {/* Help Text */}
+                        {!currentGameId && (
+                            <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                                <div className="text-blue-400 text-4xl mb-2">🎮</div>
+                                <h4 className="text-lg font-semibold text-blue-900 mb-2">Select or Create a Game</h4>
+                                <p className="text-blue-700">
+                                    Create a new game or select an existing game above to start managing questions.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

@@ -7,17 +7,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase environment variables')
 }
 
-// Debug info in development
-if (process.env.NODE_ENV === 'development') {
-    console.log('Supabase URL:', supabaseUrl)
-    console.log('Supabase Key (first 20 chars):', supabaseAnonKey.substring(0, 20) + '...')
-}
+// Debug info in development (disabled)
+// if (process.env.NODE_ENV === 'development') {
+//     console.log('Supabase URL:', supabaseUrl)
+//     console.log('Supabase Key (first 20 chars):', supabaseAnonKey.substring(0, 20) + '...')
+// }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        debug: process.env.NODE_ENV === 'development'
+        debug: false // Disable debug logging
     }
 })

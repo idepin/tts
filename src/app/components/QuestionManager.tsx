@@ -28,9 +28,10 @@ const generateGridFromQuestions = (questions: Question[], gridSize: { rows: numb
 interface QuestionManagerProps {
     crosswordData: CrosswordData;
     onUpdate: (data: CrosswordData) => void;
+    currentGameId?: string | null; // ID of the game being edited
 }
 
-export default function QuestionManager({ crosswordData, onUpdate }: QuestionManagerProps) {
+export default function QuestionManager({ crosswordData, onUpdate, currentGameId }: QuestionManagerProps) {
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [newQuestion, setNewQuestion] = useState({
         clue: '',
@@ -44,6 +45,60 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
     const [saveMessage, setSaveMessage] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
     const [adminCheckDone, setAdminCheckDone] = useState(false);
+    const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+    const [lastSaved, setLastSaved] = useState<string>('');
+
+    // Auto-save effect - triggers when questions change
+    useEffect(() => {
+        if (!autoSaveEnabled || !isAdmin || crosswordData.questions.length === 0) {
+            return;
+        }
+
+        // Debounce auto-save by 2 seconds
+        const autoSaveTimer = setTimeout(() => {
+            handleAutoSave();
+        }, 2000);
+
+        return () => clearTimeout(autoSaveTimer);
+    }, [crosswordData.questions, autoSaveEnabled, isAdmin]);
+
+    const handleAutoSave = async () => {
+        if (!isAdmin || crosswordData.questions.length === 0) return;
+
+        try {
+            setIsLoading(true);
+            let success = false;
+
+            if (currentGameId) {
+                console.log('💾 Auto-saving to selected game:', currentGameId);
+                // Update the currently selected game
+                success = await CrosswordService.updateGame(currentGameId, crosswordData.questions);
+            } else {
+                console.log('💾 Auto-saving: creating new game (no game selected)');
+                // Create new game if no game is selected
+                const gameId = await CrosswordService.createGame('Auto-saved Game', crosswordData.questions);
+                success = !!gameId;
+            }
+
+            if (success) {
+                const now = new Date().toLocaleTimeString();
+                setLastSaved(now);
+                setSaveMessage(`💾 Auto-saved at ${now}`);
+                // Also save to localStorage as backup
+                localStorage.setItem('crosswordQuestions', JSON.stringify(crosswordData.questions));
+            }
+        } catch (error) {
+            console.error('Auto-save error:', error);
+        } finally {
+            setIsLoading(false);
+            // Clear auto-save message after 2 seconds
+            setTimeout(() => {
+                if (saveMessage.includes('Auto-saved')) {
+                    setSaveMessage('');
+                }
+            }, 2000);
+        }
+    };
 
     // Check admin status on mount
     useEffect(() => {
@@ -105,35 +160,43 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
 
     const saveToSupabase = async () => {
         if (crosswordData.questions.length === 0) {
-            setSaveMessage('No questions to save');
+            setSaveMessage('❌ No questions to save');
             setTimeout(() => setSaveMessage(''), 3000);
             return;
         }
 
         setIsLoading(true);
         try {
-            const gameData = await CrosswordService.getActiveGame();
+            console.log('🔍 Manual save triggered...');
             let success = false;
+            let gameId = null;
 
-            if (gameData) {
-                // Update existing game
-                success = await CrosswordService.updateGame(gameData.game.id, crosswordData.questions);
+            if (currentGameId) {
+                console.log('📝 Updating selected game:', currentGameId);
+                // Update the currently selected game
+                success = await CrosswordService.updateGame(currentGameId, crosswordData.questions);
+                gameId = currentGameId;
             } else {
-                // Create new game
-                const gameId = await CrosswordService.createGame('Teka-Teki Silang', crosswordData.questions);
+                console.log('🆕 Creating new game (no game selected)...');
+                // Create new game if no game is selected
+                gameId = await CrosswordService.createGame('Manual Save Game', crosswordData.questions);
                 success = !!gameId;
             }
 
             if (success) {
-                setSaveMessage('✅ Successfully saved to Supabase!');
+                const now = new Date().toLocaleTimeString();
+                setLastSaved(now);
+                setSaveMessage(`✅ Successfully saved to Supabase at ${now}!`);
                 // Also save to localStorage as backup
                 localStorage.setItem('crosswordQuestions', JSON.stringify(crosswordData.questions));
+                console.log('✅ Manual save completed successfully');
             } else {
                 setSaveMessage('❌ Failed to save to Supabase');
+                console.error('❌ Manual save failed');
             }
-        } catch (error) {
-            console.error('Error saving to Supabase:', error);
-            setSaveMessage('❌ Error saving to Supabase');
+        } catch (error: any) {
+            console.error('❌ Error saving to Supabase:', error);
+            setSaveMessage('❌ Error saving to Supabase: ' + (error?.message || 'Unknown error'));
         } finally {
             setIsLoading(false);
             setTimeout(() => setSaveMessage(''), 5000);
@@ -162,56 +225,12 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
     const testDatabaseConnection = async () => {
         setIsLoading(true);
         try {
-            // Test 1: Check auth
-            const { data: user } = await supabase.auth.getUser();
-            if (!user.user) {
-                setSaveMessage('❌ Not authenticated - please login first');
-                return;
+            const result = await CrosswordService.testDatabaseConnection();
+            setSaveMessage(result.success ? `✅ ${result.message}` : `❌ ${result.message}`);
+
+            if (!result.success && result.details) {
+                console.error('Test details:', result.details);
             }
-
-            console.log('✅ Auth check passed:', user.user.id);
-
-            // Test 2: Try to read from crossword_games table
-            const { data: games, error: gamesError } = await supabase
-                .from('crossword_games')
-                .select('*')
-                .limit(1);
-
-            if (gamesError) {
-                console.error('❌ Database read error:', gamesError);
-                setSaveMessage(`❌ Database error: ${gamesError.message}. Check SUPABASE_SETUP_URGENT.md`);
-                return;
-            }
-
-            console.log('✅ Database read test passed');
-
-            // Test 3: Try to insert a test game
-            const { data: testGame, error: insertError } = await supabase
-                .from('crossword_games')
-                .insert({
-                    title: 'Test Game (will be deleted)',
-                    created_by: user.user.id,
-                    grid_size: 10,
-                    is_active: false
-                })
-                .select()
-                .single();
-
-            if (insertError) {
-                console.error('❌ Database insert error:', insertError);
-                setSaveMessage(`❌ Insert error: ${insertError.message}. Check RLS policies`);
-                return;
-            }
-
-            // Clean up test game
-            await supabase
-                .from('crossword_games')
-                .delete()
-                .eq('id', testGame.id);
-
-            console.log('✅ Database insert test passed');
-            setSaveMessage('✅ Database connection test successful! You can now save to Supabase.');
-
         } catch (error: any) {
             console.error('❌ Test failed:', error);
             setSaveMessage(`❌ Test failed: ${error.message}`);
@@ -278,7 +297,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
             };
         } else {
             // Add new question
-            const newId = Math.max(...crosswordData.questions.map(q => q.id)) + 1;
+            const existingIds = crosswordData.questions.map(q => q.id).filter(id => id != null);
+            const newId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
             updatedQuestions.push({
                 id: newId,
                 clue: newQuestion.clue.trim(),
@@ -295,6 +315,13 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
             questions: updatedQuestions,
             grid: generateGridFromQuestions(updatedQuestions, gridSize)
         });
+
+        // Show save feedback
+        if (autoSaveEnabled && isAdmin) {
+            setSaveMessage('📝 Question saved - auto-saving to database...');
+        } else if (isAdmin) {
+            setSaveMessage('📝 Question saved - click "Save to Supabase" to persist');
+        }
 
         // Reset form
         setEditingIndex(null);
@@ -315,6 +342,13 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                 questions: updatedQuestions,
                 grid: generateGridFromQuestions(updatedQuestions, gridSize)
             });
+
+            // Show save feedback
+            if (autoSaveEnabled && isAdmin) {
+                setSaveMessage('🗑️ Question deleted - auto-saving to database...');
+            } else if (isAdmin) {
+                setSaveMessage('🗑️ Question deleted - click "Save to Supabase" to persist');
+            }
         }
     };
 
@@ -344,13 +378,37 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                 </div>
 
                 {saveMessage && (
-                    <div className={`mb-4 p-3 rounded ${saveMessage.includes('✅') ? 'bg-green-100 text-green-800' :
-                            saveMessage.includes('❌') ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'
+                    <div className={`mb-4 p-3 rounded ${saveMessage.includes('✅') || saveMessage.includes('💾') ? 'bg-green-100 text-green-800' :
+                        saveMessage.includes('❌') ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
                         }`}>
                         {saveMessage}
                     </div>
                 )}
+
+                {/* Auto-Save Controls */}
+                <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 rounded">
+                    <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={autoSaveEnabled}
+                                onChange={(e) => setAutoSaveEnabled(e.target.checked)}
+                                className="rounded"
+                                disabled={!isAdmin}
+                            />
+                            🔄 Auto-save enabled
+                        </label>
+                        {lastSaved && (
+                            <span className="text-xs text-gray-500">
+                                Last saved: {lastSaved}
+                            </span>
+                        )}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                        {autoSaveEnabled && isAdmin ? '✅ Changes will be saved automatically' : '⚠️ Manual save required'}
+                    </div>
+                </div>
 
                 <div className="flex flex-wrap gap-3">
                     <button
@@ -386,14 +444,6 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                     </button>
                 </div>
 
-                <p className="text-sm text-blue-700 mt-3">
-                    💡 {isAdmin ? 'Admin dapat manage semua data crossword.' : 'Player hanya bisa view data.'}
-                    Local storage digunakan sebagai backup.
-                </p>
-
-                <div className="text-sm text-purple-700 mt-2 p-2 bg-purple-50 rounded">
-                    ⚠️ <strong>Perlu jadi admin?</strong> Jalankan file <code>setup-admin-system.sql</code> dan ganti email di dalamnya.
-                </div>
             </div>
             {/* Grid Preview */}
             <div>

@@ -25,11 +25,118 @@ export interface CrosswordQuestion {
 }
 
 export class CrosswordService {
+    // Test database connection and policies
+    static async testDatabaseConnection(): Promise<{ success: boolean; message: string; details?: any }> {
+        try {
+            console.log('🔍 Testing database connection...');
+
+            // Test 1: Check auth
+            const { data: user, error: authError } = await supabase.auth.getUser();
+            if (authError) {
+                return { success: false, message: `Auth error: ${authError.message}`, details: authError };
+            }
+
+            if (!user.user) {
+                // In development, provide more helpful guidance
+                if (process.env.NODE_ENV === 'development') {
+                    return {
+                        success: false,
+                        message: 'Not authenticated - Go to /auth to login first. For testing, you can also run createTestUser() in console.',
+                        details: {
+                            suggestion: 'Run: await supabase.auth.signInAnonymously() for testing',
+                            loginUrl: '/auth'
+                        }
+                    };
+                }
+                return { success: false, message: 'Not authenticated - please login first' };
+            }
+
+            console.log('✅ Auth check passed:', user.user.id, user.user.email);
+
+            // Test 2: Check admin status
+            const isUserAdmin = await this.isAdmin();
+            console.log('✅ Admin status:', isUserAdmin);
+
+            // Test 3: Try to read from crossword_games table
+            const { data: games, error: gamesError } = await supabase
+                .from('crossword_games')
+                .select('*')
+                .limit(1);
+
+            if (gamesError) {
+                console.error('❌ Database read error:', gamesError);
+                return {
+                    success: false,
+                    message: `Database read error: ${gamesError.message}`,
+                    details: gamesError
+                };
+            }
+
+            console.log('✅ Database read test passed, found', games?.length || 0, 'games');
+
+            // Test 4: Try to insert a test game
+            const { data: testGame, error: insertError } = await supabase
+                .from('crossword_games')
+                .insert({
+                    title: 'Test Game (will be deleted)',
+                    created_by: user.user.id,
+                    grid_size: 10,
+                    is_active: false
+                })
+                .select()
+                .single();
+
+            if (insertError) {
+                console.error('❌ Database insert error:', insertError);
+                return {
+                    success: false,
+                    message: `Insert error: ${insertError.message}. ${!isUserAdmin ? 'You need admin privileges.' : 'Check RLS policies.'}`,
+                    details: insertError
+                };
+            }
+
+            // Clean up test game
+            const { error: deleteError } = await supabase
+                .from('crossword_games')
+                .delete()
+                .eq('id', testGame.id);
+
+            if (deleteError) {
+                console.warn('⚠️ Warning: could not delete test game:', deleteError);
+            }
+
+            console.log('✅ Database insert test passed');
+            return {
+                success: true,
+                message: `Database connection successful! Admin status: ${isUserAdmin ? 'Yes 👑' : 'No 👤'}`
+            };
+
+        } catch (error: any) {
+            console.error('❌ Test failed:', error);
+            return {
+                success: false,
+                message: `Test failed: ${error.message}`,
+                details: error
+            };
+        }
+    }
     // Check if current user is admin
     static async isAdmin(): Promise<boolean> {
         try {
-            const { data: user } = await supabase.auth.getUser();
-            if (!user.user) return false;
+            console.log('🔍 Checking admin status...');
+            const { data: user, error: userError } = await supabase.auth.getUser();
+
+            if (userError) {
+                console.error('❌ Auth error:', userError);
+                return false;
+            }
+
+            if (!user.user) {
+                console.log('❌ No authenticated user');
+                return false;
+            }
+
+            console.log('✅ User authenticated:', user.user.id, user.user.email);
 
             const { data: roleData, error } = await supabase
                 .from('user_roles')
@@ -38,14 +145,72 @@ export class CrosswordService {
                 .single();
 
             if (error) {
-                console.log('No role found for user, assuming player');
+                console.log('❌ No role found for user:', error.message, 'Details:', error);
+                console.log('🔍 This means user is not in user_roles table. Run setup-admin-system.sql');
                 return false;
             }
 
+            console.log('✅ Role found:', roleData?.role);
             return roleData?.role === 'admin';
         } catch (error) {
-            console.error('Error checking admin status:', error);
+            console.error('❌ Error checking admin status:', error);
             return false;
+        }
+    }
+
+    // Get specific game by ID with questions
+    static async getGameById(gameId: string): Promise<{ game: CrosswordGame; questions: Question[] } | null> {
+        try {
+            console.log('🔍 Fetching game by ID:', gameId);
+
+            // Get specific game
+            const { data: game, error: gameError } = await supabase
+                .from('crossword_games')
+                .select('*')
+                .eq('id', gameId)
+                .single();
+
+            if (gameError) {
+                console.error('❌ Error fetching game:', gameError);
+                return null;
+            }
+
+            if (!game) {
+                console.log('❌ Game not found');
+                return null;
+            }
+
+            console.log('✅ Game found:', game.title);
+
+            // Get questions for this game
+            const { data: questions, error: questionsError } = await supabase
+                .from('crossword_questions')
+                .select('*')
+                .eq('game_id', game.id)
+                .order('question_number');
+
+            if (questionsError) {
+                console.error('❌ Error fetching questions:', questionsError);
+                return null;
+            }
+
+            console.log('✅ Found', questions?.length || 0, 'questions for game');
+
+            // Convert to our Question format
+            const convertedQuestions: Question[] = (questions || []).map(q => ({
+                id: q.question_number,
+                clue: q.question_text,
+                answer: q.answer,
+                direction: q.direction as 'horizontal' | 'vertical',
+                startRow: q.start_row,
+                startCol: q.start_col,
+                number: q.question_number
+            }));
+
+            return { game, questions: convertedQuestions };
+        } catch (error) {
+            console.error('❌ Error in getGameById:', error);
+            return null;
         }
     }
 
@@ -141,7 +306,7 @@ export class CrosswordService {
                     title,
                     created_by: user.user.id,
                     grid_size: 10,
-                    is_active: true
+                    is_active: false
                 })
                 .select()
                 .single();
@@ -161,22 +326,30 @@ export class CrosswordService {
 
             // Insert questions
             console.log('📝 Inserting questions...', questions.length);
-            const questionsToInsert = questions.map(q => ({
-                game_id: game.id,
-                question_number: q.id,
-                question_text: q.clue,
-                answer: q.answer,
-                direction: q.direction,
-                start_row: q.startRow,
-                start_col: q.startCol,
-                length: q.answer.length
-            }));
+            const questionsToInsert = questions.map((q, index) => {
+                const questionNumber = q.id || q.number || (index + 1);
+                console.log(`Processing question ${index}: id=${q.id}, number=${q.number}, final=${questionNumber}`);
+
+                return {
+                    game_id: game.id,
+                    question_number: questionNumber,
+                    question_text: q.clue || '',
+                    answer: q.answer || '',
+                    direction: q.direction || 'horizontal',
+                    start_row: q.startRow || 0,
+                    start_col: q.startCol || 0,
+                    length: (q.answer || '').length
+                };
+            });
 
             console.log('📋 Questions to insert:', questionsToInsert);
 
             const { error: questionsError } = await supabase
                 .from('crossword_questions')
-                .insert(questionsToInsert);
+                .upsert(questionsToInsert, {
+                    onConflict: 'game_id,question_number',
+                    ignoreDuplicates: false
+                });
 
             if (questionsError) {
                 console.error('❌ Error creating questions:', questionsError);
@@ -202,37 +375,48 @@ export class CrosswordService {
     // Update existing game questions
     static async updateGame(gameId: string, questions: Question[]): Promise<boolean> {
         try {
-            // Delete existing questions
+            console.log('🔄 Updating game:', gameId, 'with', questions.length, 'questions');
+
+            // Method 1: Try direct replace with unique question numbers
+            const questionsToInsert = questions.map((q, index) => {
+                const questionNumber = (index + 1); // Always use sequential numbers to avoid conflicts
+
+                return {
+                    game_id: gameId,
+                    question_number: questionNumber,
+                    question_text: q.clue || '',
+                    answer: q.answer || '',
+                    direction: q.direction || 'horizontal',
+                    start_row: q.startRow || 0,
+                    start_col: q.startCol || 0,
+                    length: (q.answer || '').length
+                };
+            });
+
+            // First, delete ALL existing questions for this game
+            console.log('🗑️ Clearing all existing questions for game:', gameId);
             const { error: deleteError } = await supabase
                 .from('crossword_questions')
                 .delete()
                 .eq('game_id', gameId);
 
             if (deleteError) {
-                console.error('Error deleting old questions:', deleteError);
+                console.error('❌ Error deleting old questions:', deleteError);
                 return false;
             }
+            console.log('✅ All old questions deleted');
 
-            // Insert new questions
-            const questionsToInsert = questions.map(q => ({
-                game_id: gameId,
-                question_number: q.id,
-                question_text: q.clue,
-                answer: q.answer,
-                direction: q.direction,
-                start_row: q.startRow,
-                start_col: q.startCol,
-                length: q.answer.length
-            }));
-
+            // Then insert fresh questions with clean numbering
+            console.log('📝 Inserting', questionsToInsert.length, 'fresh questions');
             const { error: insertError } = await supabase
                 .from('crossword_questions')
                 .insert(questionsToInsert);
 
             if (insertError) {
-                console.error('Error inserting new questions:', insertError);
+                console.error('❌ Error inserting fresh questions:', insertError);
                 return false;
             }
+            console.log('✅ Fresh questions inserted successfully');
 
             // Update game timestamp
             await supabase
@@ -310,6 +494,84 @@ export class CrosswordService {
         } catch (error) {
             console.error('Error in getAllGames:', error);
             return [];
+        }
+    }
+
+    // Update game status (active/inactive)
+    static async updateGameStatus(gameId: string, isActive: boolean): Promise<boolean> {
+        try {
+            console.log(`🔄 Updating game ${gameId} to ${isActive ? 'active' : 'inactive'}`);
+
+            // If setting to active, first deactivate ALL other games
+            if (isActive) {
+                console.log('🔄 Deactivating all other games first...');
+                const { error: deactivateError } = await supabase
+                    .from('crossword_games')
+                    .update({
+                        is_active: false,
+                        updated_at: new Date().toISOString()
+                    })
+                    .neq('id', gameId); // Deactivate all except this one
+
+                if (deactivateError) {
+                    console.error('❌ Error deactivating other games:', deactivateError);
+                    return false;
+                }
+                console.log('✅ All other games deactivated');
+            }
+
+            // Now update the target game
+            const { error } = await supabase
+                .from('crossword_games')
+                .update({
+                    is_active: isActive,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', gameId);
+
+            if (error) {
+                console.error('❌ Error updating game status:', error);
+                return false;
+            }
+
+            console.log(`✅ Game ${gameId} ${isActive ? 'activated' : 'deactivated'} successfully`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error in updateGameStatus:', error);
+            return false;
+        }
+    }
+
+    // Delete game and its questions
+    static async deleteGame(gameId: string): Promise<boolean> {
+        try {
+            // First delete all questions for this game
+            const { error: questionsError } = await supabase
+                .from('crossword_questions')
+                .delete()
+                .eq('game_id', gameId);
+
+            if (questionsError) {
+                console.error('Error deleting game questions:', questionsError);
+                return false;
+            }
+
+            // Then delete the game
+            const { error: gameError } = await supabase
+                .from('crossword_games')
+                .delete()
+                .eq('id', gameId);
+
+            if (gameError) {
+                console.error('Error deleting game:', gameError);
+                return false;
+            }
+
+            console.log(`✅ Game ${gameId} and its questions deleted`);
+            return true;
+        } catch (error) {
+            console.error('Error in deleteGame:', error);
+            return false;
         }
     }
 }
