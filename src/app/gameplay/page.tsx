@@ -1,8 +1,9 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import WordBox from '../components/WordBox';
 import ClueList from '../components/ClueList';
 import ScoreBoard from '../components/ScoreBoard';
+import ScoreManager, { ScoreManagerRef } from '../components/ScoreManager';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { Question, GameState } from '../../types/crossword';
 import { calculateScore } from '../../data/simpleCrosswordData';
@@ -12,6 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function Gameplay() {
     const { user, signOut } = useAuth();
+    const scoreManagerRef = useRef<ScoreManagerRef>(null);
     const [crosswordData, setCrosswordData] = useState(() =>
         CrosswordManager.getInstance().getData()
     );
@@ -25,6 +27,7 @@ export default function Gameplay() {
     const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [adminCheckLoading, setAdminCheckLoading] = useState(true);
+    const [currentGameId, setCurrentGameId] = useState<string | null>(null);
 
     // Check admin status
     useEffect(() => {
@@ -68,6 +71,9 @@ export default function Gameplay() {
                 // First try to load from Supabase
                 const gameData = await CrosswordService.getActiveGame();
                 if (gameData && gameData.questions.length > 0) {
+                    // Set current game ID for score tracking
+                    setCurrentGameId(gameData.game.id);
+
                     // Update CrosswordManager with Supabase data
                     const manager = CrosswordManager.getInstance();
                     manager.updateData({
@@ -75,15 +81,17 @@ export default function Gameplay() {
                         grid: generateGridFromQuestions(gameData.questions)
                     });
                     setCrosswordData(manager.getData());
-                    console.log('Loaded crossword data from Supabase');
+                    console.log('Loaded crossword data from Supabase, Game ID:', gameData.game.id);
                 } else {
                     // Fallback to localStorage/default data
+                    setCurrentGameId(null); // No active game for score tracking
                     setCrosswordData(CrosswordManager.getInstance().getData());
                     console.log('Loaded crossword data from local storage');
                 }
             } catch (error) {
                 console.error('Error loading crossword data:', error);
                 // Fallback to localStorage/default data
+                setCurrentGameId(null);
                 setCrosswordData(CrosswordManager.getInstance().getData());
             }
         };
@@ -95,6 +103,7 @@ export default function Gameplay() {
 
     const checkCompletion = useCallback(() => {
         const completedQuestions: number[] = [];
+        const previouslyCompleted = gameState.completedQuestions;
 
         crosswordData.questions.forEach(question => {
             let isComplete = true;
@@ -111,11 +120,32 @@ export default function Gameplay() {
 
             if (isComplete) {
                 completedQuestions.push(question.id);
+
+                // Check if this is a newly completed question
+                if (!previouslyCompleted.includes(question.id) && currentGameId && scoreManagerRef.current) {
+                    // Auto-save score increment for newly completed question
+                    scoreManagerRef.current.incrementScore(10).then(success => {
+                        if (success) {
+                            console.log(`✅ Score incremented for completed question: ${question.id}`);
+                        }
+                    });
+                }
             }
         });
 
         const score = calculateScore(completedQuestions.length, crosswordData.questions.length);
         const isCompleted = completedQuestions.length === crosswordData.questions.length;
+
+        // Check if game just got completed
+        if (isCompleted && !gameState.isCompleted && currentGameId && scoreManagerRef.current) {
+            // Mark game as completed in database
+            const completionTime = Math.floor(Date.now() / 1000); // Current timestamp in seconds
+            scoreManagerRef.current.markCompleted(completionTime).then(success => {
+                if (success) {
+                    console.log('✅ Game marked as completed in database');
+                }
+            });
+        }
 
         setGameState(prev => ({
             ...prev,
@@ -123,7 +153,7 @@ export default function Gameplay() {
             score,
             isCompleted
         }));
-    }, [gameState.userAnswers, crosswordData.questions]);
+    }, [gameState.userAnswers, gameState.completedQuestions, gameState.isCompleted, crosswordData.questions, currentGameId]);
 
     useEffect(() => {
         checkCompletion();
@@ -310,6 +340,12 @@ export default function Gameplay() {
                                     Go to Login
                                 </button>
                             )}
+                            <a
+                                href="/leaderboard"
+                                className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded text-sm transition-colors"
+                            >
+                                🏆 Leaderboard
+                            </a>
                             {isAdmin && (
                                 <a
                                     href="/admin"
@@ -377,6 +413,17 @@ export default function Gameplay() {
                                 totalQuestions={crosswordData.questions.length}
                                 onReset={handleReset}
                             />
+
+                            {/* Score Manager for auto-save to database */}
+                            {currentGameId && (
+                                <ScoreManager
+                                    ref={scoreManagerRef}
+                                    gameId={currentGameId}
+                                    onScoreUpdate={(score) => {
+                                        console.log('Score updated in database:', score);
+                                    }}
+                                />
+                            )}
 
                             <ClueList
                                 questions={crosswordData.questions}

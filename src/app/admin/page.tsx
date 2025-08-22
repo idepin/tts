@@ -5,6 +5,7 @@ import { dummyCrosswordData } from '../../data/simpleCrosswordData';
 import { CrosswordManager } from '../../utils/CrosswordManager';
 import GameManager from '../components/GameManager';
 import EditGameModal from '../components/EditGameModal';
+import ScoreViewer from '../components/ScoreViewer';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { CrosswordService } from '../../lib/crosswordService';
 
@@ -17,6 +18,7 @@ export default function Admin() {
     const [accessDenied, setAccessDenied] = useState(false);
     const [currentGameId, setCurrentGameId] = useState<string | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [activeTab, setActiveTab] = useState<'games' | 'scores'>('games');
 
     // Check admin status
     useEffect(() => {
@@ -111,15 +113,61 @@ export default function Admin() {
                             </div>
                         </div>
 
+                        {/* Tab Navigation */}
+                        <div className="flex border-b border-gray-200 mb-6">
+                            <button
+                                onClick={() => setActiveTab('games')}
+                                className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === 'games'
+                                        ? 'border-purple-500 text-purple-600 bg-purple-50'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                            >
+                                🎮 Game Management
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('scores')}
+                                className={`px-6 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === 'scores'
+                                        ? 'border-purple-500 text-purple-600 bg-purple-50'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                            >
+                                📊 Player Scores
+                            </button>
+                            <button
+                                onClick={() => window.open('/leaderboard', '_blank')}
+                                className="px-6 py-3 font-medium text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                            >
+                                🏆 Public Leaderboard ↗
+                            </button>
+                        </div>
 
+                        {/* Tab Content */}
+                        {activeTab === 'games' ? (
+                            <>
+                                {/* Game Management */}
+                                <GameManager
+                                    onGameSelect={handleGameSelect}
+                                    currentGameId={currentGameId}
+                                />
 
-                        {/* Game Management */}
-                        <GameManager
-                            onGameSelect={handleGameSelect}
-                            currentGameId={currentGameId}
-                        />
+                                {/* Help Text for Games */}
+                                <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                                    <div className="text-blue-400 text-4xl mb-2">🎮</div>
+                                    <h4 className="text-lg font-semibold text-blue-900 mb-2">Game Management Made Easy</h4>
+                                    <p className="text-blue-700">
+                                        Create new crossword games or select an existing game to edit its questions.
+                                        Click <strong>"✏️ Edit"</strong> on any game to open the question editor in a clean popup window.
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {/* Score Viewer */}
+                                <ScoreViewer isAdmin={isAdmin} />
+                            </>
+                        )}
 
-                        {/* Edit Game Modal */}
+                        {/* Edit Game Modal - Always available */}
                         {showEditModal && currentGameId && (
                             <EditGameModal
                                 gameId={currentGameId}
@@ -133,16 +181,6 @@ export default function Admin() {
                                 }}
                             />
                         )}
-
-                        {/* Help Text */}
-                        <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg text-center">
-                            <div className="text-blue-400 text-4xl mb-2">🎮</div>
-                            <h4 className="text-lg font-semibold text-blue-900 mb-2">Game Management Made Easy</h4>
-                            <p className="text-blue-700">
-                                Create new crossword games or select an existing game to edit its questions.
-                                Click <strong>"✏️ Edit"</strong> on any game to open the question editor in a clean popup window.
-                            </p>
-                        </div>
                     </div>
                 </div>
             </div>

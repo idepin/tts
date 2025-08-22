@@ -24,6 +24,19 @@ export interface CrosswordQuestion {
     length: number;
 }
 
+export interface PlayerScore {
+    id: string;
+    created_at: string;
+    updated_at: string;
+    user_id: string;
+    game_id: string;
+    score: number;
+    total_questions: number;
+    correct_answers: number;
+    completion_time: number;
+    is_completed: boolean;
+}
+
 export class CrosswordService {
     // Test database connection and policies
     static async testDatabaseConnection(): Promise<{ success: boolean; message: string; details?: any }> {
@@ -597,6 +610,198 @@ export class CrosswordService {
             return true;
         } catch (error) {
             console.error('Error in deleteGame:', error);
+            return false;
+        }
+    }
+
+    // ===== PLAYER SCORE METHODS =====
+
+    // Get or create player score for current game
+    static async getOrCreatePlayerScore(gameId: string): Promise<PlayerScore | null> {
+        try {
+            const { data: user, error: userError } = await supabase.auth.getUser();
+            if (userError || !user.user) {
+                console.error('❌ User not authenticated for score tracking');
+                return null;
+            }
+
+            const userId = user.user.id;
+
+            // First try to get existing score
+            const { data: existingScore, error: getError } = await supabase
+                .from('player_scores')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('game_id', gameId)
+                .single();
+
+            if (getError && getError.code !== 'PGRST116') { // PGRST116 = no rows found
+                console.error('❌ Error getting player score:', getError);
+                return null;
+            }
+
+            if (existingScore) {
+                console.log('✅ Found existing player score:', existingScore);
+                return existingScore;
+            }
+
+            // Get total questions for this game
+            const { data: questions, error: questionsError } = await supabase
+                .from('crossword_questions')
+                .select('id')
+                .eq('game_id', gameId);
+
+            if (questionsError) {
+                console.error('❌ Error getting game questions count:', questionsError);
+                return null;
+            }
+
+            const totalQuestions = questions?.length || 0;
+
+            // Create new score record
+            const { data: newScore, error: createError } = await supabase
+                .from('player_scores')
+                .insert({
+                    user_id: userId,
+                    game_id: gameId,
+                    score: 0,
+                    total_questions: totalQuestions,
+                    correct_answers: 0,
+                    completion_time: 0,
+                    is_completed: false
+                })
+                .select()
+                .single();
+
+            if (createError) {
+                console.error('❌ Error creating player score:', createError);
+                return null;
+            }
+
+            console.log('✅ Created new player score:', newScore);
+            return newScore;
+        } catch (error) {
+            console.error('❌ Error in getOrCreatePlayerScore:', error);
+            return null;
+        }
+    }
+
+    // Update player score (auto-save when score changes)
+    static async updatePlayerScore(
+        gameId: string,
+        scoreData: {
+            score?: number;
+            correct_answers?: number;
+            completion_time?: number;
+            is_completed?: boolean;
+        }
+    ): Promise<boolean> {
+        try {
+            const { data: user, error: userError } = await supabase.auth.getUser();
+            if (userError || !user.user) {
+                console.error('❌ User not authenticated for score update');
+                return false;
+            }
+
+            const userId = user.user.id;
+
+            const { error } = await supabase
+                .from('player_scores')
+                .update({
+                    ...scoreData,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('user_id', userId)
+                .eq('game_id', gameId);
+
+            if (error) {
+                console.error('❌ Error updating player score:', error);
+                return false;
+            }
+
+            console.log('✅ Player score updated:', scoreData);
+            return true;
+        } catch (error) {
+            console.error('❌ Error in updatePlayerScore:', error);
+            return false;
+        }
+    }
+
+    // Get player's current score for a game
+    static async getPlayerScore(gameId: string): Promise<PlayerScore | null> {
+        try {
+            const { data: user, error: userError } = await supabase.auth.getUser();
+            if (userError || !user.user) {
+                return null;
+            }
+
+            const { data: score, error } = await supabase
+                .from('player_scores')
+                .select('*')
+                .eq('user_id', user.user.id)
+                .eq('game_id', gameId)
+                .single();
+
+            if (error && error.code !== 'PGRST116') {
+                console.error('❌ Error getting player score:', error);
+                return null;
+            }
+
+            return score || null;
+        } catch (error) {
+            console.error('❌ Error in getPlayerScore:', error);
+            return null;
+        }
+    }
+
+    // Get leaderboard for a game
+    static async getGameLeaderboard(gameId: string, limit: number = 10): Promise<PlayerScore[]> {
+        try {
+            const { data: scores, error } = await supabase
+                .from('player_scores')
+                .select('*')
+                .eq('game_id', gameId)
+                .order('score', { ascending: false })
+                .order('completion_time', { ascending: true })
+                .limit(limit);
+
+            if (error) {
+                console.error('❌ Error getting leaderboard:', error);
+                return [];
+            }
+
+            return scores || [];
+        } catch (error) {
+            console.error('❌ Error in getGameLeaderboard:', error);
+            return [];
+        }
+    }
+
+    // Auto-save score increment (called when player answers correctly)
+    static async incrementScore(gameId: string, pointsToAdd: number = 10): Promise<boolean> {
+        try {
+            // Get or create player score
+            const playerScore = await this.getOrCreatePlayerScore(gameId);
+            if (!playerScore) {
+                return false;
+            }
+
+            // Update score and correct answers count
+            const newScore = playerScore.score + pointsToAdd;
+            const newCorrectAnswers = playerScore.correct_answers + 1;
+
+            const success = await this.updatePlayerScore(gameId, {
+                score: newScore,
+                correct_answers: newCorrectAnswers
+            });
+
+            if (success) {
+                console.log(`✅ Score incremented by ${pointsToAdd}. New score: ${newScore}`);
+            }
+
+            return success;
+        } catch (error) {
+            console.error('❌ Error in incrementScore:', error);
             return false;
         }
     }
