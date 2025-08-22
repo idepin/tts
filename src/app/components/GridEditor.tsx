@@ -167,7 +167,7 @@ export default function GridEditor({ crosswordData, onUpdate }: GridEditorProps)
                 {selectedCell && (
                     <div className="mb-4 p-3 bg-blue-50 rounded">
                         <p className="text-sm text-blue-800">
-                            Selected: Baris {selectedCell.row}, Kolom {selectedCell.col}
+                            Selected: Baris {selectedCell.row + 1}, Kolom {selectedCell.col + 1}
                         </p>
                     </div>
                 )}

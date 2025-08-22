@@ -13,8 +13,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
         clue: '',
         answer: '',
         direction: 'horizontal' as 'horizontal' | 'vertical',
-        startRow: 0,
-        startCol: 0
+        startRow: 1,
+        startCol: 1
     });
 
     const handleEditQuestion = (index: number) => {
@@ -24,8 +24,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
             clue: question.clue,
             answer: question.answer,
             direction: question.direction,
-            startRow: question.startRow,
-            startCol: question.startCol
+            startRow: question.startRow + 1,
+            startCol: question.startCol + 1
         });
     };
 
@@ -36,26 +36,26 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
         }
 
         // Validasi posisi baris dan kolom
-        if (newQuestion.startRow < 0 || newQuestion.startRow > 9) {
-            alert('Posisi baris harus antara 0-9!');
+        if (newQuestion.startRow < 1 || newQuestion.startRow > 10) {
+            alert('Posisi baris harus antara 1-10!');
             return;
         }
-        
-        if (newQuestion.startCol < 0 || newQuestion.startCol > 9) {
-            alert('Posisi kolom harus antara 0-9!');
+
+        if (newQuestion.startCol < 1 || newQuestion.startCol > 10) {
+            alert('Posisi kolom harus antara 1-10!');
             return;
         }
 
         // Validasi apakah jawaban muat dalam grid
         const answerLength = newQuestion.answer.trim().length;
         if (newQuestion.direction === 'horizontal') {
-            if (newQuestion.startCol + answerLength > 10) {
-                alert(`Jawaban terlalu panjang untuk posisi ini! Maksimal ${10 - newQuestion.startCol} karakter dari kolom ${newQuestion.startCol}.`);
+            if (newQuestion.startCol + answerLength - 1 > 10) {
+                alert(`Jawaban terlalu panjang untuk posisi ini! Maksimal ${10 - newQuestion.startCol + 1} karakter dari kolom ${newQuestion.startCol}.`);
                 return;
             }
         } else {
-            if (newQuestion.startRow + answerLength > 10) {
-                alert(`Jawaban terlalu panjang untuk posisi ini! Maksimal ${10 - newQuestion.startRow} karakter dari baris ${newQuestion.startRow}.`);
+            if (newQuestion.startRow + answerLength - 1 > 10) {
+                alert(`Jawaban terlalu panjang untuk posisi ini! Maksimal ${10 - newQuestion.startRow + 1} karakter dari baris ${newQuestion.startRow}.`);
                 return;
             }
         }
@@ -69,8 +69,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                 clue: newQuestion.clue.trim(),
                 answer: newQuestion.answer.toUpperCase().trim(),
                 direction: newQuestion.direction,
-                startRow: newQuestion.startRow,
-                startCol: newQuestion.startCol
+                startRow: newQuestion.startRow - 1,
+                startCol: newQuestion.startCol - 1
             };
         } else {
             // Add new question
@@ -80,8 +80,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                 clue: newQuestion.clue.trim(),
                 answer: newQuestion.answer.toUpperCase().trim(),
                 direction: newQuestion.direction,
-                startRow: newQuestion.startRow,
-                startCol: newQuestion.startCol,
+                startRow: newQuestion.startRow - 1,
+                startCol: newQuestion.startCol - 1,
                 number: newId
             });
         }
@@ -97,8 +97,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
             clue: '',
             answer: '',
             direction: 'horizontal',
-            startRow: 0,
-            startCol: 0
+            startRow: 1,
+            startCol: 1
         });
     };
 
@@ -118,8 +118,8 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
             clue: '',
             answer: '',
             direction: 'horizontal',
-            startRow: 0,
-            startCol: 0
+            startRow: 1,
+            startCol: 1
         });
     };
 
@@ -130,7 +130,7 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                     {editingIndex !== null ? 'Edit Pertanyaan' : 'Tambah Pertanyaan Baru'}
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">
-                    Posisi baris dan kolom dimulai dari 0. Grid berukuran 10x10 (0-9 untuk baris dan kolom).
+                    Posisi baris dan kolom dimulai dari 1. Grid berukuran 10x10 (1-10 untuk baris dan kolom).
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -169,14 +169,14 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                         <label className="block text-sm font-medium mb-2 text-black">Posisi Baris:</label>
                         <input
                             type="number"
-                            min="0"
-                            max="9"
+                            min="1"
+                            max="10"
                             value={newQuestion.startRow}
                             onChange={(e) => setNewQuestion({
                                 ...newQuestion,
-                                startRow: parseInt(e.target.value) || 0
+                                startRow: parseInt(e.target.value) || 1
                             })}
-                            placeholder="0-9"
+                            placeholder="1-10"
                             className="w-full border rounded px-3 py-2 text-black"
                         />
                     </div>
@@ -185,14 +185,14 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                         <label className="block text-sm font-medium mb-2 text-black">Posisi Kolom:</label>
                         <input
                             type="number"
-                            min="0"
-                            max="9"
+                            min="1"
+                            max="10"
                             value={newQuestion.startCol}
                             onChange={(e) => setNewQuestion({
                                 ...newQuestion,
-                                startCol: parseInt(e.target.value) || 0
+                                startCol: parseInt(e.target.value) || 1
                             })}
-                            placeholder="0-9"
+                            placeholder="1-10"
                             className="w-full border rounded px-3 py-2 text-black"
                         />
                     </div>
@@ -240,7 +240,7 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-2">
                                         <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
-                                            #{question.number}
+                                            #{index + 1}
                                         </span>
                                         <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
                                             {question.direction === 'horizontal' ? 'Mendatar' : 'Menurun'}
@@ -251,7 +251,7 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
                                     </div>
                                     <p className="text-black">{question.clue}</p>
                                     <p className="text-xs text-gray-500 mt-1">
-                                        Posisi: Baris {question.startRow}, Kolom {question.startCol}
+                                        Posisi: Baris {question.startRow + 1}, Kolom {question.startCol + 1}
                                     </p>
                                 </div>
 
