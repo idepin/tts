@@ -1,11 +1,13 @@
 'use client';
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useRouter } from 'next/navigation';
 
 export default function LoginForm() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isSignUp, setIsSignUp] = useState(false);
+    const router = useRouter();
     const [formData, setFormData] = useState({
         email: '',
         password: '',
@@ -59,8 +61,8 @@ export default function LoginForm() {
                 if (data.user && !data.session) {
                     setError('Pendaftaran berhasil! Silakan cek email Anda untuk konfirmasi akun.');
                 } else {
-                    // Auto login successful
-                    window.location.href = '/gameplay';
+                    // Auto login successful - let AuthContext handle redirect
+                    console.log('Registration and auto-login successful');
                 }
             } else {
                 // Sign in with email
@@ -71,8 +73,8 @@ export default function LoginForm() {
 
                 if (error) throw error;
 
-                // Login successful
-                window.location.href = '/gameplay';
+                // Login successful - let AuthContext handle redirect
+                console.log('Login successful');
             }
         } catch (error: any) {
             console.error('Error with email auth:', error);

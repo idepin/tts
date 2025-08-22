@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
     user: User | null;
@@ -29,6 +30,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
         // Get initial session
@@ -51,14 +53,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     console.log('User signed in, redirecting to gameplay...');
                     // Use timeout to avoid race conditions
                     setTimeout(() => {
-                        window.location.href = '/gameplay';
+                        router.push('/gameplay');
                     }, 100);
                 }
             }
         );
 
         return () => subscription.unsubscribe();
-    }, []);
+    }, [router]);
 
     const signOut = async () => {
         await supabase.auth.signOut();
