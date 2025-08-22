@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import WordBox from '../components/WordBox';
 import ClueList from '../components/ClueList';
-import ScoreBoard from '../components/ScoreBoard';
 import ScoreManager, { ScoreManagerRef } from '../components/ScoreManager';
 import AutoSaveIndicator from '../components/AutoSaveIndicator';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -29,6 +28,7 @@ export default function Gameplay() {
     const [isAdmin, setIsAdmin] = useState(false);
     const [adminCheckLoading, setAdminCheckLoading] = useState(true);
     const [currentGameId, setCurrentGameId] = useState<string | null>(null);
+    const [gameInfo, setGameInfo] = useState<{ title: string; description?: string } | null>(null);
     const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
     const [isAutoSaving, setIsAutoSaving] = useState(false);
 
@@ -77,6 +77,12 @@ export default function Gameplay() {
                     // Set current game ID for score tracking
                     setCurrentGameId(gameData.game.id);
 
+                    // Set game info for display
+                    setGameInfo({
+                        title: gameData.game.title,
+                        description: gameData.game.description
+                    });
+
                     // Update CrosswordManager with Supabase data
                     const manager = CrosswordManager.getInstance();
                     manager.updateData({
@@ -107,6 +113,7 @@ export default function Gameplay() {
                 } else {
                     // Fallback to localStorage/default data
                     setCurrentGameId(null); // No active game for score tracking
+                    setGameInfo(null); // No game info
                     setCrosswordData(CrosswordManager.getInstance().getData());
                     console.log('Loaded crossword data from local storage');
                 }
@@ -114,6 +121,7 @@ export default function Gameplay() {
                 console.error('Error loading crossword data:', error);
                 // Fallback to localStorage/default data
                 setCurrentGameId(null);
+                setGameInfo(null);
                 setCrosswordData(CrosswordManager.getInstance().getData());
             }
         };
@@ -368,17 +376,6 @@ export default function Gameplay() {
         setFocusedCell({ row: targetRow, col: targetCol });
     };
 
-    const handleReset = () => {
-        setGameState({
-            userAnswers: {},
-            score: 0,
-            completedQuestions: [],
-            isCompleted: false
-        });
-        setActiveQuestion(null);
-        setFocusedCell(null);
-    };
-
     const isNumberedCell = (row: number, col: number): { isNumbered: boolean; number?: number } => {
         // Find questions that start at this position
         const questionsAtPosition = crosswordData.questions.filter(q =>
@@ -501,7 +498,21 @@ export default function Gameplay() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Crossword Grid */}
-                        <div className="lg:col-span-2 flex justify-center">
+                        <div className="lg:col-span-2 flex flex-col items-center">
+                            {/* Game Title and Description */}
+                            {gameInfo && (
+                                <div className="mb-4 text-center">
+                                    <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                                        {gameInfo.title}
+                                    </h2>
+                                    {gameInfo.description && (
+                                        <p className="text-gray-600 text-sm max-w-lg mx-auto">
+                                            {gameInfo.description}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="bg-white p-4 rounded-lg shadow-lg">
                                 <div className="grid grid-cols-10 gap-px w-fit mx-auto">
                                     {crosswordData.grid.map((row, rowIndex) =>
@@ -550,13 +561,6 @@ export default function Gameplay() {
 
                         {/* Side Panel */}
                         <div className="space-y-4">
-                            <ScoreBoard
-                                score={gameState.score}
-                                completedQuestions={gameState.completedQuestions.length}
-                                totalQuestions={crosswordData.questions.length}
-                                onReset={handleReset}
-                            />
-
                             {/* Score Manager for auto-save to database */}
                             {currentGameId && (
                                 <ScoreManager
