@@ -35,6 +35,7 @@ export interface PlayerScore {
     correct_answers: number;
     completion_time: number;
     is_completed: boolean;
+    user_answers?: { [key: string]: string }; // "row-col": "letter"
 }
 
 export class CrosswordService {
@@ -804,5 +805,98 @@ export class CrosswordService {
             console.error('❌ Error in incrementScore:', error);
             return false;
         }
+    }
+
+    // Save user answers to database (auto-save progress)
+    static async saveUserAnswers(gameId: string, userAnswers: { [key: string]: string }): Promise<boolean> {
+        try {
+            const { data: user, error: userError } = await supabase.auth.getUser();
+            if (userError || !user.user) {
+                console.error('❌ User not authenticated for saving answers');
+                return false;
+            }
+
+            const userId = user.user.id;
+
+            // First ensure player score record exists
+            const playerScore = await this.getOrCreatePlayerScore(gameId);
+            if (!playerScore) {
+                console.error('❌ Could not create/get player score for saving answers');
+                return false;
+            }
+
+            // Update user_answers in the database
+            const { error } = await supabase
+                .from('player_scores')
+                .update({
+                    user_answers: userAnswers,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('user_id', userId)
+                .eq('game_id', gameId);
+
+            if (error) {
+                console.error('❌ Error saving user answers:', error);
+                return false;
+            }
+
+            console.log('✅ User answers saved to database');
+            return true;
+        } catch (error) {
+            console.error('❌ Error in saveUserAnswers:', error);
+            return false;
+        }
+    }
+
+    // Load user answers from database
+    static async loadUserAnswers(gameId: string): Promise<{ [key: string]: string } | null> {
+        try {
+            const { data: user, error: userError } = await supabase.auth.getUser();
+            if (userError || !user.user) {
+                console.log('❌ User not authenticated for loading answers');
+                return null;
+            }
+
+            const userId = user.user.id;
+
+            const { data: playerScore, error } = await supabase
+                .from('player_scores')
+                .select('user_answers')
+                .eq('user_id', userId)
+                .eq('game_id', gameId)
+                .single();
+
+            if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+                console.error('❌ Error loading user answers:', error);
+                return null;
+            }
+
+            if (playerScore && playerScore.user_answers) {
+                console.log('✅ User answers loaded from database:', Object.keys(playerScore.user_answers).length, 'answers');
+                return playerScore.user_answers;
+            }
+
+            console.log('📝 No saved answers found for this game');
+            return {};
+        } catch (error) {
+            console.error('❌ Error in loadUserAnswers:', error);
+            return null;
+        }
+    }
+
+    // Auto-save user answers with debouncing (called on every input change)
+    static debounceTimer: NodeJS.Timeout | null = null;
+    static async autoSaveUserAnswers(gameId: string, userAnswers: { [key: string]: string }): Promise<void> {
+        // Clear existing timer
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
+
+        // Set new timer for 2 seconds
+        this.debounceTimer = setTimeout(async () => {
+            await this.saveUserAnswers(gameId, userAnswers);
+        }, 2000);
+
+        console.log('⏳ Auto-save scheduled for user answers');
     }
 }

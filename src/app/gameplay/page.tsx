@@ -4,6 +4,7 @@ import WordBox from '../components/WordBox';
 import ClueList from '../components/ClueList';
 import ScoreBoard from '../components/ScoreBoard';
 import ScoreManager, { ScoreManagerRef } from '../components/ScoreManager';
+import AutoSaveIndicator from '../components/AutoSaveIndicator';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { Question, GameState } from '../../types/crossword';
 import { calculateScore } from '../../data/simpleCrosswordData';
@@ -28,6 +29,7 @@ export default function Gameplay() {
     const [isAdmin, setIsAdmin] = useState(false);
     const [adminCheckLoading, setAdminCheckLoading] = useState(true);
     const [currentGameId, setCurrentGameId] = useState<string | null>(null);
+    const [isAutoSaving, setIsAutoSaving] = useState(false);
 
     // Check admin status
     useEffect(() => {
@@ -82,6 +84,16 @@ export default function Gameplay() {
                     });
                     setCrosswordData(manager.getData());
                     console.log('Loaded crossword data from Supabase, Game ID:', gameData.game.id);
+
+                    // Load saved user answers for this game
+                    const savedAnswers = await CrosswordService.loadUserAnswers(gameData.game.id);
+                    if (savedAnswers && Object.keys(savedAnswers).length > 0) {
+                        console.log('✅ Loaded saved user answers:', Object.keys(savedAnswers).length, 'answers');
+                        setGameState(prev => ({
+                            ...prev,
+                            userAnswers: savedAnswers
+                        }));
+                    }
                 } else {
                     // Fallback to localStorage/default data
                     setCurrentGameId(null); // No active game for score tracking
@@ -101,9 +113,8 @@ export default function Gameplay() {
         return () => window.removeEventListener('focus', loadData);
     }, []);
 
-    const checkCompletion = useCallback(() => {
+    const checkCompletion = useCallback((userAnswers = gameState.userAnswers) => {
         const completedQuestions: number[] = [];
-        const previouslyCompleted = gameState.completedQuestions;
 
         crosswordData.questions.forEach(question => {
             let isComplete = true;
@@ -112,7 +123,7 @@ export default function Gameplay() {
                 const col = question.direction === 'horizontal' ? question.startCol + i : question.startCol;
                 const cellKey = `${row}-${col}`;
 
-                if (gameState.userAnswers[cellKey] !== question.answer[i]) {
+                if (userAnswers[cellKey] !== question.answer[i]) {
                     isComplete = false;
                     break;
                 }
@@ -120,44 +131,54 @@ export default function Gameplay() {
 
             if (isComplete) {
                 completedQuestions.push(question.id);
-
-                // Check if this is a newly completed question
-                if (!previouslyCompleted.includes(question.id) && currentGameId && scoreManagerRef.current) {
-                    // Auto-save score increment for newly completed question
-                    scoreManagerRef.current.incrementScore(10).then(success => {
-                        if (success) {
-                            console.log(`✅ Score incremented for completed question: ${question.id}`);
-                        }
-                    });
-                }
             }
         });
 
         const score = calculateScore(completedQuestions.length, crosswordData.questions.length);
         const isCompleted = completedQuestions.length === crosswordData.questions.length;
 
-        // Check if game just got completed
-        if (isCompleted && !gameState.isCompleted && currentGameId && scoreManagerRef.current) {
-            // Mark game as completed in database
-            const completionTime = Math.floor(Date.now() / 1000); // Current timestamp in seconds
-            scoreManagerRef.current.markCompleted(completionTime).then(success => {
-                if (success) {
-                    console.log('✅ Game marked as completed in database');
-                }
-            });
-        }
+        // Always update the state to ensure UI reflects current state
+        setGameState(prev => {
+            // Check if there are newly completed questions
+            const newlyCompleted = completedQuestions.filter(qId => !prev.completedQuestions.includes(qId));
+            
+            // Auto-save score increment for newly completed questions
+            if (newlyCompleted.length > 0 && currentGameId && scoreManagerRef.current) {
+                newlyCompleted.forEach(questionId => {
+                    scoreManagerRef.current?.incrementScore(10).then(success => {
+                        if (success) {
+                            console.log(`✅ Score incremented for completed question: ${questionId}`);
+                        }
+                    });
+                });
+            }
 
-        setGameState(prev => ({
-            ...prev,
-            completedQuestions,
-            score,
-            isCompleted
-        }));
-    }, [gameState.userAnswers, gameState.completedQuestions, gameState.isCompleted, crosswordData.questions, currentGameId]);
+            // Check if game just got completed
+            if (isCompleted && !prev.isCompleted && currentGameId && scoreManagerRef.current) {
+                // Mark game as completed in database
+                const completionTime = Math.floor(Date.now() / 1000);
+                scoreManagerRef.current.markCompleted(completionTime).then(success => {
+                    if (success) {
+                        console.log('✅ Game marked as completed in database');
+                    }
+                });
+            }
 
+            // Always return updated state
+            return {
+                ...prev,
+                userAnswers,
+                completedQuestions,
+                score,
+                isCompleted
+            };
+        });
+    }, [crosswordData.questions, currentGameId]);
+
+    // Only run checkCompletion once on mount to initialize state
     useEffect(() => {
         checkCompletion();
-    }, [checkCompletion]);
+    }, [crosswordData.questions]);
 
     const handleCellClick = (row: number, col: number) => {
         if (crosswordData.grid[row][col] === null) return;
@@ -213,13 +234,30 @@ export default function Gameplay() {
 
     const handleInputChange = (row: number, col: number, value: string) => {
         const cellKey = `${row}-${col}`;
+        const newUserAnswers = {
+            ...gameState.userAnswers,
+            [cellKey]: value
+        };
+
+        // Update state with new answers
         setGameState(prev => ({
             ...prev,
-            userAnswers: {
-                ...prev.userAnswers,
-                [cellKey]: value
-            }
+            userAnswers: newUserAnswers
         }));
+
+        // Immediately check completion with new answers
+        checkCompletion(newUserAnswers);
+
+        // Auto-save user answers to database with debouncing
+        if (currentGameId) {
+            setIsAutoSaving(true);
+            CrosswordService.autoSaveUserAnswers(currentGameId, newUserAnswers);
+
+            // Reset auto-save indicator after debounce time + buffer
+            setTimeout(() => {
+                setIsAutoSaving(false);
+            }, 2500);
+        }
 
         // Auto-advance to next cell if value is entered and there's an active question
         if (value && activeQuestion) {
@@ -311,7 +349,14 @@ export default function Gameplay() {
                 <div className="max-w-7xl mx-auto">
                     {/* Header with user info */}
                     <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-3xl font-bold text-black">Teka-Teki Silang</h1>
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-3xl font-bold text-black">Teka-Teki Silang</h1>
+                            {/* Auto-save indicator */}
+                            <AutoSaveIndicator
+                                isActive={isAutoSaving && currentGameId !== null}
+                                className="hidden md:flex"
+                            />
+                        </div>
                         <div className="flex items-center gap-4">
                             <div className="text-sm text-gray-600">
                                 {user ? (
@@ -424,6 +469,14 @@ export default function Gameplay() {
                                     }}
                                 />
                             )}
+
+                            {/* Auto-save indicator for mobile */}
+                            <div className="md:hidden">
+                                <AutoSaveIndicator
+                                    isActive={isAutoSaving && currentGameId !== null}
+                                    className="justify-center"
+                                />
+                            </div>
 
                             <ClueList
                                 questions={crosswordData.questions}
