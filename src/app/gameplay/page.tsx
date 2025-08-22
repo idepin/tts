@@ -454,7 +454,7 @@ export default function Gameplay() {
                         <div className="flex items-center gap-4">
                             <div className="text-sm text-gray-600">
                                 {user ? (
-                                    `Welcome, ${user.email || user.user_metadata?.full_name || 'Player'}`
+                                    `Welcome, ${user.user_metadata?.full_name || user.email || 'Player'}`
                                 ) : (
                                     'Not authenticated'
                                 )}

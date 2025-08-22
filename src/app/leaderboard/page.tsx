@@ -6,6 +6,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 interface LeaderboardEntry extends PlayerScore {
     user_email?: string;
     game_title?: string;
+    user_display_name?: string;
 }
 
 export default function Leaderboard() {
@@ -228,7 +229,7 @@ export default function Leaderboard() {
                                                 </td>
                                                 <td className="border border-gray-200 px-4 py-3">
                                                     <div className="font-medium text-gray-900">
-                                                        {score.user_email || `User ${score.user_id.slice(0, 8)}...`}
+                                                        {score.user_display_name || score.user_email || `User ${score.user_id.slice(0, 8)}...`}
                                                     </div>
                                                 </td>
                                                 {selectedGameId === 'all' && (

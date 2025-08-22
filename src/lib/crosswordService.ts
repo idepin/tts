@@ -36,6 +36,7 @@ export interface PlayerScore {
     completion_time: number;
     is_completed: boolean;
     user_answers?: { [key: string]: string }; // "row-col": "letter"
+    user_display_name?: string; // Display name for leaderboard
 }
 
 export class CrosswordService {
@@ -648,6 +649,9 @@ export class CrosswordService {
 
             const totalQuestions = questions?.length || 0;
 
+            // Get user display name
+            const userDisplayName = user.user.user_metadata?.full_name || user.user.email || `User ${userId.slice(0, 8)}...`;
+
             // Create new score record
             const { data: newScore, error: createError } = await supabase
                 .from('player_scores')
@@ -658,7 +662,8 @@ export class CrosswordService {
                     total_questions: totalQuestions,
                     correct_answers: 0,
                     completion_time: 0,
-                    is_completed: false
+                    is_completed: false,
+                    user_display_name: userDisplayName
                 })
                 .select()
                 .single();
@@ -760,7 +765,13 @@ export class CrosswordService {
                 return [];
             }
 
-            return scores || [];
+            // For scores that don't have user_display_name, generate fallback
+            const scoresWithDisplayNames = (scores || []).map(score => ({
+                ...score,
+                user_display_name: score.user_display_name || `User ${score.user_id.slice(0, 8)}...`
+            }));
+
+            return scoresWithDisplayNames;
         } catch (error) {
             console.error('❌ Error in getGameLeaderboard:', error);
             return [];

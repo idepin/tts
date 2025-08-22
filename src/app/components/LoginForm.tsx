@@ -1,12 +1,16 @@
 'use client';
 import React, { useState } from 'react';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '../../lib/supabase';
 
 export default function LoginForm() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+        fullName: ''
+    });
 
     const signInWithGoogle = async () => {
         setIsLoading(true);
@@ -27,6 +31,52 @@ export default function LoginForm() {
         } catch (error: any) {
             console.error('Error signing in with Google:', error);
             setError(error.message || 'Gagal login dengan Google. Pastikan konfigurasi Google OAuth sudah benar di Supabase.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleEmailAuth = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            if (isSignUp) {
+                // Sign up with email and fullname
+                const { data, error } = await supabase.auth.signUp({
+                    email: formData.email,
+                    password: formData.password,
+                    options: {
+                        data: {
+                            full_name: formData.fullName
+                        }
+                    }
+                });
+
+                if (error) throw error;
+
+                if (data.user && !data.session) {
+                    setError('Pendaftaran berhasil! Silakan cek email Anda untuk konfirmasi akun.');
+                } else {
+                    // Auto login successful
+                    window.location.href = '/gameplay';
+                }
+            } else {
+                // Sign in with email
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: formData.email,
+                    password: formData.password
+                });
+
+                if (error) throw error;
+
+                // Login successful
+                window.location.href = '/gameplay';
+            }
+        } catch (error: any) {
+            console.error('Error with email auth:', error);
+            setError(error.message || 'Terjadi kesalahan saat proses autentikasi.');
         } finally {
             setIsLoading(false);
         }
@@ -93,30 +143,85 @@ export default function LoginForm() {
                             <div className="w-full border-t border-gray-300" />
                         </div>
                         <div className="relative flex justify-center text-sm">
-                            <span className="px-2 bg-white text-gray-500">Atau login dengan email</span>
+                            <span className="px-2 bg-white text-gray-500">Atau {isSignUp ? 'daftar' : 'login'} dengan email</span>
                         </div>
                     </div>
 
-                    {/* Supabase Auth Component */}
-                    <Auth
-                        supabaseClient={supabase}
-                        appearance={{
-                            theme: ThemeSupa,
-                            variables: {
-                                default: {
-                                    colors: {
-                                        brand: '#3b82f6',
-                                        brandAccent: '#2563eb',
-                                    },
-                                },
-                            },
-                        }}
-                        providers={[]}
-                        redirectTo={`${typeof window !== 'undefined' ? window.location.origin : ''}/gameplay`}
-                        onlyThirdPartyProviders={false}
-                        magicLink={false}
-                        view="sign_in"
-                    />
+                    {/* Custom Email Form */}
+                    <form onSubmit={handleEmailAuth} className="space-y-4">
+                        {isSignUp && (
+                            <div>
+                                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Nama Lengkap
+                                </label>
+                                <input
+                                    type="text"
+                                    id="fullName"
+                                    value={formData.fullName}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="Masukkan nama lengkap"
+                                    required
+                                />
+                            </div>
+                        )}
+
+                        <div>
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                                Email
+                            </label>
+                            <input
+                                type="email"
+                                id="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Masukkan email"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                                Password
+                            </label>
+                            <input
+                                type="password"
+                                id="password"
+                                value={formData.password}
+                                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Masukkan password"
+                                minLength={6}
+                                required
+                            />
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                        >
+                            {isLoading ? 'Memproses...' : (isSignUp ? 'Daftar' : 'Login')}
+                        </button>
+                    </form>
+
+                    <div className="mt-6 text-center">
+                        <p className="text-sm text-gray-600">
+                            {isSignUp ? 'Sudah punya akun?' : 'Belum punya akun?'}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsSignUp(!isSignUp);
+                                    setError(null);
+                                    setFormData({ email: '', password: '', fullName: '' });
+                                }}
+                                className="ml-2 text-blue-600 hover:text-blue-800 font-medium"
+                            >
+                                {isSignUp ? 'Login di sini' : 'Daftar di sini'}
+                            </button>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
