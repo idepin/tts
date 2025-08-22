@@ -14,10 +14,22 @@ export default function Leaderboard() {
     const [selectedGameId, setSelectedGameId] = useState<string>('all');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         loadGames();
+        checkAdminStatus();
     }, []);
+
+    const checkAdminStatus = async () => {
+        try {
+            const adminStatus = await CrosswordService.isAdmin();
+            setIsAdmin(adminStatus);
+        } catch (error) {
+            console.error('Error checking admin status:', error);
+            setIsAdmin(false);
+        }
+    };
 
     useEffect(() => {
         if (selectedGameId === 'all' && games.length > 0) {
@@ -135,12 +147,14 @@ export default function Leaderboard() {
                                 >
                                     🎮 Play Game
                                 </a>
-                                <a
-                                    href="/admin"
-                                    className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded transition-colors"
-                                >
-                                    ⚙️ Admin
-                                </a>
+                                {isAdmin && (
+                                    <a
+                                        href="/admin"
+                                        className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded transition-colors"
+                                    >
+                                        ⚙️ Admin
+                                    </a>
+                                )}
                             </div>
                         </div>
 
