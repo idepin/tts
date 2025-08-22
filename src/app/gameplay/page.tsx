@@ -1,14 +1,17 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import WordBox from '../components/WordBox';
 import ClueList from '../components/ClueList';
 import ScoreBoard from '../components/ScoreBoard';
 import QuestionEditor from '../components/QuestionEditor';
 import { Question, GameState } from '../../types/crossword';
-import { dummyCrosswordData, calculateScore } from '../../data/crosswordData';
+import { calculateScore } from '../../data/simpleCrosswordData';
+import { CrosswordManager } from '../../utils/CrosswordManager';
 
 export default function Gameplay() {
-    const [crosswordData, setCrosswordData] = useState(dummyCrosswordData);
+    const [crosswordData, setCrosswordData] = useState(() =>
+        CrosswordManager.getInstance().getData()
+    );
     const [gameState, setGameState] = useState<GameState>({
         userAnswers: {},
         score: 0,
@@ -16,13 +19,19 @@ export default function Gameplay() {
         isCompleted: false
     });
     const [activeQuestion, setActiveQuestion] = useState<Question | null>(null);
-    const [selectedCell, setSelectedCell] = useState<{ row: number, col: number } | null>(null);
 
+    // Load latest data when component mounts and on window focus
     useEffect(() => {
-        checkCompletion();
-    }, [gameState.userAnswers]);
+        const loadData = () => {
+            setCrosswordData(CrosswordManager.getInstance().getData());
+        };
 
-    const checkCompletion = () => {
+        loadData();
+        window.addEventListener('focus', loadData);
+        return () => window.removeEventListener('focus', loadData);
+    }, []);
+
+    const checkCompletion = useCallback(() => {
         const completedQuestions: number[] = [];
 
         crosswordData.questions.forEach(question => {
@@ -52,12 +61,14 @@ export default function Gameplay() {
             score,
             isCompleted
         }));
-    };
+    }, [gameState.userAnswers, crosswordData.questions]);
+
+    useEffect(() => {
+        checkCompletion();
+    }, [checkCompletion]);
 
     const handleCellClick = (row: number, col: number) => {
         if (crosswordData.grid[row][col] === null) return;
-
-        setSelectedCell({ row, col });
 
         // Find questions that intersect with this cell
         const intersectingQuestions = crosswordData.questions.filter(question => {
@@ -90,7 +101,6 @@ export default function Gameplay() {
 
     const handleQuestionClick = (question: Question) => {
         setActiveQuestion(question);
-        setSelectedCell({ row: question.startRow, col: question.startCol });
     };
 
     const handleReset = () => {
@@ -101,14 +111,15 @@ export default function Gameplay() {
             isCompleted: false
         });
         setActiveQuestion(null);
-        setSelectedCell(null);
     };
 
     const handleUpdateQuestions = (newQuestions: Question[]) => {
-        setCrosswordData(prev => ({
-            ...prev,
+        const updatedData = {
+            ...crosswordData,
             questions: newQuestions
-        }));
+        };
+        setCrosswordData(updatedData);
+        CrosswordManager.getInstance().updateData(updatedData);
         handleReset(); // Reset game when questions are updated
     };
 

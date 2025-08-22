@@ -107,7 +107,17 @@ export default function Home() {
             width={16}
             height={16}
           />
-          Test
+          🎮 Play Game
+        </Link>
+        <Link href={"admin/"} className="flex items-center gap-2 hover:underline hover:underline-offset-4">
+          <Image
+            aria-hidden
+            src="/window.svg"
+            alt="Admin icon"
+            width={16}
+            height={16}
+          />
+          ⚙️ Admin Panel
         </Link>
 
       </footer>

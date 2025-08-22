@@ -1,0 +1,279 @@
+'use client';
+import React, { useState } from 'react';
+import { CrosswordData, Question } from '../../types/crossword';
+
+interface QuestionManagerProps {
+    crosswordData: CrosswordData;
+    onUpdate: (data: CrosswordData) => void;
+}
+
+export default function QuestionManager({ crosswordData, onUpdate }: QuestionManagerProps) {
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [newQuestion, setNewQuestion] = useState({
+        clue: '',
+        answer: '',
+        direction: 'horizontal' as 'horizontal' | 'vertical',
+        startRow: 0,
+        startCol: 0
+    });
+
+    const handleEditQuestion = (index: number) => {
+        const question = crosswordData.questions[index];
+        setEditingIndex(index);
+        setNewQuestion({
+            clue: question.clue,
+            answer: question.answer,
+            direction: question.direction,
+            startRow: question.startRow,
+            startCol: question.startCol
+        });
+    };
+
+    const handleSaveQuestion = () => {
+        if (!newQuestion.clue.trim() || !newQuestion.answer.trim()) {
+            alert('Pertanyaan dan jawaban tidak boleh kosong!');
+            return;
+        }
+
+        // Validasi posisi baris dan kolom
+        if (newQuestion.startRow < 0 || newQuestion.startRow > 9) {
+            alert('Posisi baris harus antara 0-9!');
+            return;
+        }
+        
+        if (newQuestion.startCol < 0 || newQuestion.startCol > 9) {
+            alert('Posisi kolom harus antara 0-9!');
+            return;
+        }
+
+        // Validasi apakah jawaban muat dalam grid
+        const answerLength = newQuestion.answer.trim().length;
+        if (newQuestion.direction === 'horizontal') {
+            if (newQuestion.startCol + answerLength > 10) {
+                alert(`Jawaban terlalu panjang untuk posisi ini! Maksimal ${10 - newQuestion.startCol} karakter dari kolom ${newQuestion.startCol}.`);
+                return;
+            }
+        } else {
+            if (newQuestion.startRow + answerLength > 10) {
+                alert(`Jawaban terlalu panjang untuk posisi ini! Maksimal ${10 - newQuestion.startRow} karakter dari baris ${newQuestion.startRow}.`);
+                return;
+            }
+        }
+
+        const updatedQuestions = [...crosswordData.questions];
+
+        if (editingIndex !== null) {
+            // Update existing question
+            updatedQuestions[editingIndex] = {
+                ...updatedQuestions[editingIndex],
+                clue: newQuestion.clue.trim(),
+                answer: newQuestion.answer.toUpperCase().trim(),
+                direction: newQuestion.direction,
+                startRow: newQuestion.startRow,
+                startCol: newQuestion.startCol
+            };
+        } else {
+            // Add new question
+            const newId = Math.max(...crosswordData.questions.map(q => q.id)) + 1;
+            updatedQuestions.push({
+                id: newId,
+                clue: newQuestion.clue.trim(),
+                answer: newQuestion.answer.toUpperCase().trim(),
+                direction: newQuestion.direction,
+                startRow: newQuestion.startRow,
+                startCol: newQuestion.startCol,
+                number: newId
+            });
+        }
+
+        onUpdate({
+            ...crosswordData,
+            questions: updatedQuestions
+        });
+
+        // Reset form
+        setEditingIndex(null);
+        setNewQuestion({
+            clue: '',
+            answer: '',
+            direction: 'horizontal',
+            startRow: 0,
+            startCol: 0
+        });
+    };
+
+    const handleDeleteQuestion = (index: number) => {
+        if (confirm('Yakin ingin menghapus pertanyaan ini?')) {
+            const updatedQuestions = crosswordData.questions.filter((_, i) => i !== index);
+            onUpdate({
+                ...crosswordData,
+                questions: updatedQuestions
+            });
+        }
+    };
+
+    const handleCancel = () => {
+        setEditingIndex(null);
+        setNewQuestion({
+            clue: '',
+            answer: '',
+            direction: 'horizontal',
+            startRow: 0,
+            startCol: 0
+        });
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold mb-2 text-black">
+                    {editingIndex !== null ? 'Edit Pertanyaan' : 'Tambah Pertanyaan Baru'}
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                    Posisi baris dan kolom dimulai dari 0. Grid berukuran 10x10 (0-9 untuk baris dan kolom).
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-2 text-black">Arah:</label>
+                        <select
+                            value={newQuestion.direction}
+                            onChange={(e) => setNewQuestion({
+                                ...newQuestion,
+                                direction: e.target.value as 'horizontal' | 'vertical'
+                            })}
+                            className="w-full border rounded px-3 py-2 text-black"
+                        >
+                            <option value="horizontal">Mendatar</option>
+                            <option value="vertical">Menurun</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2 text-black">Jawaban:</label>
+                        <input
+                            type="text"
+                            value={newQuestion.answer}
+                            onChange={(e) => setNewQuestion({
+                                ...newQuestion,
+                                answer: e.target.value.toUpperCase()
+                            })}
+                            placeholder="Masukkan jawaban..."
+                            className="w-full border rounded px-3 py-2 text-black"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-2 text-black">Posisi Baris:</label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="9"
+                            value={newQuestion.startRow}
+                            onChange={(e) => setNewQuestion({
+                                ...newQuestion,
+                                startRow: parseInt(e.target.value) || 0
+                            })}
+                            placeholder="0-9"
+                            className="w-full border rounded px-3 py-2 text-black"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-2 text-black">Posisi Kolom:</label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="9"
+                            value={newQuestion.startCol}
+                            onChange={(e) => setNewQuestion({
+                                ...newQuestion,
+                                startCol: parseInt(e.target.value) || 0
+                            })}
+                            placeholder="0-9"
+                            className="w-full border rounded px-3 py-2 text-black"
+                        />
+                    </div>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-sm font-medium mb-2 text-black">Pertanyaan/Petunjuk:</label>
+                    <textarea
+                        value={newQuestion.clue}
+                        onChange={(e) => setNewQuestion({
+                            ...newQuestion,
+                            clue: e.target.value
+                        })}
+                        placeholder="Masukkan pertanyaan atau petunjuk..."
+                        rows={3}
+                        className="w-full border rounded px-3 py-2 resize-none text-black"
+                    />
+                </div>
+
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleSaveQuestion}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+                    >
+                        {editingIndex !== null ? 'Update' : 'Tambah'}
+                    </button>
+                    {editingIndex !== null && (
+                        <button
+                            onClick={handleCancel}
+                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+                        >
+                            Batal
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div>
+                <h3 className="text-lg font-semibold mb-4 text-black">Daftar Pertanyaan ({crosswordData.questions.length})</h3>
+
+                <div className="space-y-3">
+                    {crosswordData.questions.map((question, index) => (
+                        <div key={question.id} className="border rounded p-4 bg-white">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
+                                            #{question.number}
+                                        </span>
+                                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-sm">
+                                            {question.direction === 'horizontal' ? 'Mendatar' : 'Menurun'}
+                                        </span>
+                                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm font-bold">
+                                            {question.answer}
+                                        </span>
+                                    </div>
+                                    <p className="text-black">{question.clue}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Posisi: Baris {question.startRow}, Kolom {question.startCol}
+                                    </p>
+                                </div>
+
+                                <div className="flex gap-2 ml-4">
+                                    <button
+                                        onClick={() => handleEditQuestion(index)}
+                                        className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm"
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteQuestion(index)}
+                                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                                    >
+                                        Hapus
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
