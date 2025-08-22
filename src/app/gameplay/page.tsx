@@ -93,6 +93,15 @@ export default function Gameplay() {
                             ...prev,
                             userAnswers: savedAnswers
                         }));
+                    } else {
+                        // No saved answers, ensure state is clean
+                        setGameState(prev => ({
+                            ...prev,
+                            userAnswers: {},
+                            completedQuestions: [],
+                            score: 0,
+                            isCompleted: false
+                        }));
                     }
                 } else {
                     // Fallback to localStorage/default data
@@ -113,23 +122,31 @@ export default function Gameplay() {
         return () => window.removeEventListener('focus', loadData);
     }, []);
 
-    const checkCompletion = useCallback((userAnswers = gameState.userAnswers) => {
+    const checkCompletion = useCallback(() => {
         const completedQuestions: number[] = [];
 
         crosswordData.questions.forEach(question => {
             let isComplete = true;
+            console.log(`🔍 Checking question ${question.id}:`, question.answer);
+
             for (let i = 0; i < question.answer.length; i++) {
                 const row = question.direction === 'horizontal' ? question.startRow : question.startRow + i;
                 const col = question.direction === 'horizontal' ? question.startCol + i : question.startCol;
                 const cellKey = `${row}-${col}`;
+                const userAnswer = gameState.userAnswers[cellKey];
+                const correctAnswer = question.answer[i];
 
-                if (userAnswers[cellKey] !== question.answer[i]) {
+                console.log(`  Cell ${cellKey}: user="${userAnswer}" vs correct="${correctAnswer}"`);
+
+                // Case insensitive comparison
+                if (!userAnswer || userAnswer.toUpperCase() !== correctAnswer.toUpperCase()) {
                     isComplete = false;
                     break;
                 }
             }
 
             if (isComplete) {
+                console.log(`✅ Question ${question.id} completed!`);
                 completedQuestions.push(question.id);
             }
         });
@@ -137,11 +154,18 @@ export default function Gameplay() {
         const score = calculateScore(completedQuestions.length, crosswordData.questions.length);
         const isCompleted = completedQuestions.length === crosswordData.questions.length;
 
+        console.log('🔍 checkCompletion:', {
+            completedQuestions: completedQuestions.length,
+            totalQuestions: crosswordData.questions.length,
+            completedIds: completedQuestions,
+            userAnswers: gameState.userAnswers
+        });
+
         // Always update the state to ensure UI reflects current state
         setGameState(prev => {
             // Check if there are newly completed questions
             const newlyCompleted = completedQuestions.filter(qId => !prev.completedQuestions.includes(qId));
-            
+
             // Auto-save score increment for newly completed questions
             if (newlyCompleted.length > 0 && currentGameId && scoreManagerRef.current) {
                 newlyCompleted.forEach(questionId => {
@@ -167,21 +191,25 @@ export default function Gameplay() {
             // Always return updated state
             return {
                 ...prev,
-                userAnswers,
                 completedQuestions,
                 score,
                 isCompleted
             };
         });
-    }, [crosswordData.questions, currentGameId]);
+    }, [crosswordData.questions, currentGameId, gameState.userAnswers]);
 
-    // Only run checkCompletion once on mount to initialize state
+    // Only run checkCompletion when userAnswers changes
     useEffect(() => {
-        checkCompletion();
-    }, [crosswordData.questions]);
+        if (Object.keys(gameState.userAnswers).length > 0 || crosswordData.questions.length > 0) {
+            checkCompletion();
+        }
+    }, [gameState.userAnswers, crosswordData.questions]);
 
     const handleCellClick = (row: number, col: number) => {
         if (crosswordData.grid[row][col] === null) return;
+
+        // Don't allow clicking on cells that are already correct
+        if (isCellCorrect(row, col)) return;
 
         // Set focused cell
         setFocusedCell({ row, col });
@@ -245,9 +273,6 @@ export default function Gameplay() {
             userAnswers: newUserAnswers
         }));
 
-        // Immediately check completion with new answers
-        checkCompletion(newUserAnswers);
-
         // Auto-save user answers to database with debouncing
         if (currentGameId) {
             setIsAutoSaving(true);
@@ -265,9 +290,18 @@ export default function Gameplay() {
             let nextCol = col;
 
             if (activeQuestion.direction === 'horizontal') {
-                nextCol = col + 1;
-                // Check if next cell is within the question bounds and grid
-                if (nextCol < activeQuestion.startCol + activeQuestion.answer.length &&
+                // Find the next available (not correct) cell
+                for (let i = col + 1; i < activeQuestion.startCol + activeQuestion.answer.length; i++) {
+                    if (i < crosswordData.grid[0].length &&
+                        crosswordData.grid[nextRow][i] !== null &&
+                        !isCellCorrect(nextRow, i)) {
+                        nextCol = i;
+                        break;
+                    }
+                }
+
+                if (nextCol !== col &&
+                    nextCol < activeQuestion.startCol + activeQuestion.answer.length &&
                     nextCol < crosswordData.grid[0].length &&
                     crosswordData.grid[nextRow][nextCol] !== null) {
                     // Small delay to ensure state update is complete
@@ -276,9 +310,18 @@ export default function Gameplay() {
                     }, 10);
                 }
             } else {
-                nextRow = row + 1;
-                // Check if next cell is within the question bounds and grid
-                if (nextRow < activeQuestion.startRow + activeQuestion.answer.length &&
+                // Find the next available (not correct) cell
+                for (let i = row + 1; i < activeQuestion.startRow + activeQuestion.answer.length; i++) {
+                    if (i < crosswordData.grid.length &&
+                        crosswordData.grid[i][nextCol] !== null &&
+                        !isCellCorrect(i, nextCol)) {
+                        nextRow = i;
+                        break;
+                    }
+                }
+
+                if (nextRow !== row &&
+                    nextRow < activeQuestion.startRow + activeQuestion.answer.length &&
                     nextRow < crosswordData.grid.length &&
                     crosswordData.grid[nextRow][nextCol] !== null) {
                     // Small delay to ensure state update is complete
@@ -295,7 +338,23 @@ export default function Gameplay() {
 
     const handleQuestionClick = (question: Question) => {
         setActiveQuestion(question);
-        setFocusedCell({ row: question.startRow, col: question.startCol });
+
+        // Find the first cell in this question that is not correct yet
+        let targetRow = question.startRow;
+        let targetCol = question.startCol;
+
+        for (let i = 0; i < question.answer.length; i++) {
+            const row = question.direction === 'horizontal' ? question.startRow : question.startRow + i;
+            const col = question.direction === 'horizontal' ? question.startCol + i : question.startCol;
+
+            if (!isCellCorrect(row, col)) {
+                targetRow = row;
+                targetCol = col;
+                break;
+            }
+        }
+
+        setFocusedCell({ row: targetRow, col: targetCol });
     };
 
     const handleReset = () => {
@@ -341,6 +400,33 @@ export default function Gameplay() {
                 row >= activeQuestion.startRow &&
                 row < activeQuestion.startRow + activeQuestion.answer.length;
         }
+    };
+
+    const isCellCorrect = (row: number, col: number): boolean => {
+        const cellKey = `${row}-${col}`;
+        const userAnswer = gameState.userAnswers[cellKey];
+
+        if (!userAnswer) return false;
+
+        // Check if this cell has the correct answer in any question
+        return crosswordData.questions.some(question => {
+            if (question.direction === 'horizontal') {
+                if (row === question.startRow &&
+                    col >= question.startCol &&
+                    col < question.startCol + question.answer.length) {
+                    const answerIndex = col - question.startCol;
+                    return userAnswer.toUpperCase() === question.answer[answerIndex].toUpperCase();
+                }
+            } else {
+                if (col === question.startCol &&
+                    row >= question.startRow &&
+                    row < question.startRow + question.answer.length) {
+                    const answerIndex = row - question.startRow;
+                    return userAnswer.toUpperCase() === question.answer[answerIndex].toUpperCase();
+                }
+            }
+            return false;
+        });
     };
 
     return (
@@ -427,6 +513,7 @@ export default function Gameplay() {
                                                         rowIndex < question.startRow + question.answer.length;
                                                 }
                                             });
+                                            const cellIsCorrect = isCellCorrect(rowIndex, colIndex);
 
                                             return (
                                                 <WordBox
@@ -440,7 +527,7 @@ export default function Gameplay() {
                                                     onClick={() => handleCellClick(rowIndex, colIndex)}
                                                     onInputChange={(value) => handleInputChange(rowIndex, colIndex, value)}
                                                     onKeyDown={(e) => handleKeyDown(rowIndex, colIndex, e)}
-                                                    readOnly={false}
+                                                    readOnly={cellIsCorrect}
                                                     focused={isFocused}
                                                 />
                                             );
