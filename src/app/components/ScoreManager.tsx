@@ -5,15 +5,28 @@ import { CrosswordService, PlayerScore } from '../../lib/crosswordService';
 interface ScoreManagerProps {
     gameId: string | null;
     onScoreUpdate?: (score: PlayerScore) => void;
+    // Add props to sync with ScoreBoard values
+    currentScore?: number;
+    completedQuestions?: number;
+    totalQuestions?: number;
+    isCompleted?: boolean;
 }
 
 export interface ScoreManagerRef {
     incrementScore: (points?: number) => Promise<boolean>;
     markCompleted: (completionTime: number) => Promise<boolean>;
+    updateScore: (score: number, completedQuestions: number, userAnswers: any) => Promise<boolean>;
     playerScore: PlayerScore | null;
 }
 
-const ScoreManager = forwardRef<ScoreManagerRef, ScoreManagerProps>(({ gameId, onScoreUpdate }, ref) => {
+const ScoreManager = forwardRef<ScoreManagerRef, ScoreManagerProps>(({
+    gameId,
+    onScoreUpdate,
+    currentScore,
+    completedQuestions,
+    totalQuestions,
+    isCompleted
+}, ref) => {
     const [playerScore, setPlayerScore] = useState<PlayerScore | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -69,6 +82,41 @@ const ScoreManager = forwardRef<ScoreManagerRef, ScoreManagerProps>(({ gameId, o
         }
     };
 
+    // Function to update score during auto-save
+    const updateScore = async (score: number, completedQuestions: number, userAnswers: any) => {
+        if (!gameId) return false;
+
+        try {
+            // Update score and completed questions
+            const scoreSuccess = await CrosswordService.updatePlayerScore(gameId, {
+                score: score,
+                correct_answers: completedQuestions
+            });
+
+            // Save user answers separately
+            const answersSuccess = await CrosswordService.saveUserAnswers(gameId, userAnswers);
+
+            if (scoreSuccess && answersSuccess && playerScore) {
+                // Update local state
+                const newScore = {
+                    ...playerScore,
+                    score: score,
+                    correct_answers: completedQuestions,
+                    user_answers: userAnswers
+                };
+                setPlayerScore(newScore);
+                if (onScoreUpdate) {
+                    onScoreUpdate(newScore);
+                }
+                console.log(`✅ Score updated via auto-save: ${score} points, ${completedQuestions} completed`);
+            }
+            return scoreSuccess && answersSuccess;
+        } catch (error) {
+            console.error('❌ Error updating score:', error);
+            return false;
+        }
+    };
+
     // Function to update completion status
     const markCompleted = async (completionTime: number) => {
         if (!gameId || !playerScore) return false;
@@ -102,6 +150,7 @@ const ScoreManager = forwardRef<ScoreManagerRef, ScoreManagerProps>(({ gameId, o
     useImperativeHandle(ref, () => ({
         incrementScore,
         markCompleted,
+        updateScore,
         playerScore
     }));
 
@@ -109,31 +158,37 @@ const ScoreManager = forwardRef<ScoreManagerRef, ScoreManagerProps>(({ gameId, o
         return null;
     }
 
+    // Use props values for display if provided, otherwise fall back to database values
+    const displayScore = currentScore !== undefined ? currentScore : (playerScore?.score || 0);
+    const displayCompleted = completedQuestions !== undefined ? completedQuestions : (playerScore?.correct_answers || 0);
+    const displayTotal = totalQuestions !== undefined ? totalQuestions : (playerScore?.total_questions || 0);
+    const displayIsCompleted = isCompleted !== undefined ? isCompleted : (playerScore?.is_completed || false);
+
     return (
         <div className="score-display bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <div className="text-center">
                         <div className="text-2xl font-bold text-blue-600">
-                            {isLoading ? '...' : playerScore?.score || 0}
+                            {isLoading ? '...' : displayScore}
                         </div>
                         <div className="text-xs text-gray-500">Score</div>
                     </div>
                     <div className="text-center">
                         <div className="text-lg font-semibold text-green-600">
-                            {isLoading ? '...' : playerScore?.correct_answers || 0}
+                            {isLoading ? '...' : displayCompleted}
                         </div>
-                        <div className="text-xs text-gray-500">Correct</div>
+                        <div className="text-xs text-gray-500">Progres</div>
                     </div>
                     <div className="text-center">
                         <div className="text-lg font-semibold text-gray-600">
-                            {isLoading ? '...' : playerScore?.total_questions || 0}
+                            {isLoading ? '...' : displayTotal}
                         </div>
                         <div className="text-xs text-gray-500">Total</div>
                     </div>
                 </div>
 
-                {playerScore?.is_completed && (
+                {displayIsCompleted && (
                     <div className="flex items-center gap-2 text-green-600">
                         <span className="text-xl">🎉</span>
                         <span className="text-sm font-medium">Completed!</span>
@@ -142,17 +197,17 @@ const ScoreManager = forwardRef<ScoreManagerRef, ScoreManagerProps>(({ gameId, o
             </div>
 
             {/* Progress Bar */}
-            {playerScore && playerScore.total_questions > 0 && (
+            {displayTotal > 0 && (
                 <div className="mt-3">
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
-                        <span>Progress</span>
-                        <span>{Math.round((playerScore.correct_answers / playerScore.total_questions) * 100)}%</span>
+                        <span>Progres</span>
+                        <span>{Math.round((displayCompleted / displayTotal) * 100)}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                             className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                             style={{
-                                width: `${(playerScore.correct_answers / playerScore.total_questions) * 100}%`
+                                width: `${(displayCompleted / displayTotal) * 100}%`
                             }}
                         ></div>
                     </div>

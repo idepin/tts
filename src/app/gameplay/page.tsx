@@ -244,11 +244,53 @@ export default function Gameplay() {
             setIsAutoSaving(true);
 
             // Set new timer untuk auto-save setelah 2 detik
-            const newTimer = setTimeout(() => {
-                CrosswordService.autoSaveUserAnswers(currentGameId, newUserAnswers);
+            const newTimer = setTimeout(async () => {
+                try {
+                    // 1. Save user answers first
+                    await CrosswordService.autoSaveUserAnswers(currentGameId, newUserAnswers);
+                    console.log('💾 Step 1: Saved user answers');
+
+                    // 2. Calculate fresh score from newUserAnswers (don't use gameState as it might be stale)
+                    const completedQuestions: number[] = [];
+                    crosswordData.questions.forEach(question => {
+                        let isComplete = true;
+                        for (let i = 0; i < question.answer.length; i++) {
+                            const cellRow = question.direction === 'horizontal' ? question.startRow : question.startRow + i;
+                            const cellCol = question.direction === 'horizontal' ? question.startCol + i : question.startCol;
+                            const cellKey = `${cellRow}-${cellCol}`;
+                            const userAnswer = newUserAnswers[cellKey];
+                            const correctAnswer = question.answer[i];
+
+                            if (!userAnswer || userAnswer.toUpperCase() !== correctAnswer.toUpperCase()) {
+                                isComplete = false;
+                                break;
+                            }
+                        }
+                        if (isComplete) {
+                            completedQuestions.push(question.id);
+                        }
+                    });
+
+                    const freshScore = calculateScore(completedQuestions.length, crosswordData.questions.length);
+
+                    // 3. Save score using fresh calculated values
+                    if (scoreManagerRef.current) {
+                        const success = await scoreManagerRef.current.updateScore(
+                            freshScore,
+                            completedQuestions.length,
+                            newUserAnswers
+                        );
+                        if (success) {
+                            console.log('💾 Step 2: Saved fresh score:', freshScore, 'completed:', completedQuestions.length);
+                        }
+                    }
+
+                    console.log('✅ Auto-save completed: answers → score');
+                } catch (error) {
+                    console.error('❌ Auto-save error:', error);
+                }
                 setIsAutoSaving(false);
-                console.log('💾 Auto-saved user answers after 2 seconds');
-            }, 100);
+            }, 2000);
 
             setAutoSaveTimer(newTimer);
         }
@@ -520,6 +562,10 @@ export default function Gameplay() {
                                 <ScoreManager
                                     ref={scoreManagerRef}
                                     gameId={currentGameId}
+                                    currentScore={gameState.score}
+                                    completedQuestions={gameState.completedQuestions.length}
+                                    totalQuestions={crosswordData.questions.length}
+                                    isCompleted={gameState.completedQuestions.length === crosswordData.questions.length}
                                     onScoreUpdate={(score) => {
                                         console.log('Score updated in database:', score);
                                     }}
