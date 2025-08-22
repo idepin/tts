@@ -135,14 +135,14 @@ export default function LoginForm() {
                                                 email: 'dev@test.com',
                                                 password: 'dev123456'
                                             });
-                                            
+
                                             if (error) {
                                                 // If user doesn't exist, create it
                                                 const { error: signUpError } = await supabase.auth.signUp({
                                                     email: 'dev@test.com',
                                                     password: 'dev123456'
                                                 });
-                                                
+
                                                 if (!signUpError) {
                                                     alert('Dev account created! Please check email to confirm, or try login again.');
                                                 } else {

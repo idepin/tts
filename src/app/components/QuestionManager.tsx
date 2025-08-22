@@ -1,6 +1,8 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CrosswordData, Question } from '../../types/crossword';
+import { CrosswordService } from '../../lib/crosswordService';
+import { supabase } from '../../lib/supabase';
 
 // Helper function to generate grid from questions
 const generateGridFromQuestions = (questions: Question[], gridSize: { rows: number; cols: number }): (string | null)[][] => {
@@ -38,6 +40,186 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
         startCol: 1
     });
     const [gridSize, setGridSize] = useState({ rows: 10, cols: 10 });
+    const [isLoading, setIsLoading] = useState(false);
+    const [saveMessage, setSaveMessage] = useState('');
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [adminCheckDone, setAdminCheckDone] = useState(false);
+
+    // Check admin status on mount
+    useEffect(() => {
+        const checkAdminStatus = async () => {
+            try {
+                const adminStatus = await CrosswordService.isAdmin();
+                setIsAdmin(adminStatus);
+                if (!adminStatus) {
+                    setSaveMessage('⚠️ You need admin privileges to manage crosswords. Contact admin to get access.');
+                }
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+                setIsAdmin(false);
+                setSaveMessage('❌ Error checking admin status');
+            } finally {
+                setAdminCheckDone(true);
+            }
+        };
+
+        checkAdminStatus();
+    }, []);
+
+    // Load data from Supabase on component mount
+    useEffect(() => {
+        loadFromSupabase();
+    }, []);
+
+    const loadFromSupabase = async () => {
+        setIsLoading(true);
+        try {
+            const gameData = await CrosswordService.getActiveGame();
+            if (gameData && gameData.questions.length > 0) {
+                const newCrosswordData = {
+                    questions: gameData.questions,
+                    grid: generateGridFromQuestions(gameData.questions, gridSize)
+                };
+                onUpdate(newCrosswordData);
+                setSaveMessage('Data loaded from Supabase');
+                setTimeout(() => setSaveMessage(''), 3000);
+            } else {
+                // Try to load from localStorage as fallback
+                const localQuestions = localStorage.getItem('crosswordQuestions');
+                if (localQuestions) {
+                    const questions = JSON.parse(localQuestions);
+                    if (questions.length > 0) {
+                        setSaveMessage('Loaded from local storage - consider saving to Supabase');
+                        setTimeout(() => setSaveMessage(''), 5000);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error loading from Supabase:', error);
+            setSaveMessage('Error loading from Supabase');
+            setTimeout(() => setSaveMessage(''), 3000);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const saveToSupabase = async () => {
+        if (crosswordData.questions.length === 0) {
+            setSaveMessage('No questions to save');
+            setTimeout(() => setSaveMessage(''), 3000);
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const gameData = await CrosswordService.getActiveGame();
+            let success = false;
+
+            if (gameData) {
+                // Update existing game
+                success = await CrosswordService.updateGame(gameData.game.id, crosswordData.questions);
+            } else {
+                // Create new game
+                const gameId = await CrosswordService.createGame('Teka-Teki Silang', crosswordData.questions);
+                success = !!gameId;
+            }
+
+            if (success) {
+                setSaveMessage('✅ Successfully saved to Supabase!');
+                // Also save to localStorage as backup
+                localStorage.setItem('crosswordQuestions', JSON.stringify(crosswordData.questions));
+            } else {
+                setSaveMessage('❌ Failed to save to Supabase');
+            }
+        } catch (error) {
+            console.error('Error saving to Supabase:', error);
+            setSaveMessage('❌ Error saving to Supabase');
+        } finally {
+            setIsLoading(false);
+            setTimeout(() => setSaveMessage(''), 5000);
+        }
+    };
+
+    const importFromLocalStorage = async () => {
+        setIsLoading(true);
+        try {
+            const success = await CrosswordService.importFromLocalStorage();
+            if (success) {
+                setSaveMessage('✅ Successfully imported from localStorage to Supabase!');
+                await loadFromSupabase(); // Reload data
+            } else {
+                setSaveMessage('❌ No data found in localStorage to import');
+            }
+        } catch (error) {
+            console.error('Error importing from localStorage:', error);
+            setSaveMessage('❌ Error importing from localStorage');
+        } finally {
+            setIsLoading(false);
+            setTimeout(() => setSaveMessage(''), 5000);
+        }
+    };
+
+    const testDatabaseConnection = async () => {
+        setIsLoading(true);
+        try {
+            // Test 1: Check auth
+            const { data: user } = await supabase.auth.getUser();
+            if (!user.user) {
+                setSaveMessage('❌ Not authenticated - please login first');
+                return;
+            }
+
+            console.log('✅ Auth check passed:', user.user.id);
+
+            // Test 2: Try to read from crossword_games table
+            const { data: games, error: gamesError } = await supabase
+                .from('crossword_games')
+                .select('*')
+                .limit(1);
+
+            if (gamesError) {
+                console.error('❌ Database read error:', gamesError);
+                setSaveMessage(`❌ Database error: ${gamesError.message}. Check SUPABASE_SETUP_URGENT.md`);
+                return;
+            }
+
+            console.log('✅ Database read test passed');
+
+            // Test 3: Try to insert a test game
+            const { data: testGame, error: insertError } = await supabase
+                .from('crossword_games')
+                .insert({
+                    title: 'Test Game (will be deleted)',
+                    created_by: user.user.id,
+                    grid_size: 10,
+                    is_active: false
+                })
+                .select()
+                .single();
+
+            if (insertError) {
+                console.error('❌ Database insert error:', insertError);
+                setSaveMessage(`❌ Insert error: ${insertError.message}. Check RLS policies`);
+                return;
+            }
+
+            // Clean up test game
+            await supabase
+                .from('crossword_games')
+                .delete()
+                .eq('id', testGame.id);
+
+            console.log('✅ Database insert test passed');
+            setSaveMessage('✅ Database connection test successful! You can now save to Supabase.');
+
+        } catch (error: any) {
+            console.error('❌ Test failed:', error);
+            setSaveMessage(`❌ Test failed: ${error.message}`);
+        } finally {
+            setIsLoading(false);
+            setTimeout(() => setSaveMessage(''), 8000);
+        }
+    };
 
     const handleEditQuestion = (index: number) => {
         const question = crosswordData.questions[index];
@@ -149,6 +331,70 @@ export default function QuestionManager({ crosswordData, onUpdate }: QuestionMan
 
     return (
         <div className="space-y-6">
+            {/* Supabase Operations */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-blue-900">Database Operations</h3>
+                    {adminCheckDone && (
+                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${isAdmin ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                            {isAdmin ? '👑 Admin' : '👤 Player'}
+                        </div>
+                    )}
+                </div>
+
+                {saveMessage && (
+                    <div className={`mb-4 p-3 rounded ${saveMessage.includes('✅') ? 'bg-green-100 text-green-800' :
+                            saveMessage.includes('❌') ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                        }`}>
+                        {saveMessage}
+                    </div>
+                )}
+
+                <div className="flex flex-wrap gap-3">
+                    <button
+                        onClick={saveToSupabase}
+                        disabled={isLoading || !isAdmin}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? '⏳ Saving...' : '💾 Save to Supabase'}
+                    </button>
+
+                    <button
+                        onClick={loadFromSupabase}
+                        disabled={isLoading}
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? '⏳ Loading...' : '📥 Load from Supabase'}
+                    </button>
+
+                    <button
+                        onClick={importFromLocalStorage}
+                        disabled={isLoading || !isAdmin}
+                        className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? '⏳ Importing...' : '📤 Import from Local Storage'}
+                    </button>
+
+                    <button
+                        onClick={testDatabaseConnection}
+                        disabled={isLoading}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? '⏳ Testing...' : '🔧 Test Database'}
+                    </button>
+                </div>
+
+                <p className="text-sm text-blue-700 mt-3">
+                    💡 {isAdmin ? 'Admin dapat manage semua data crossword.' : 'Player hanya bisa view data.'}
+                    Local storage digunakan sebagai backup.
+                </p>
+
+                <div className="text-sm text-purple-700 mt-2 p-2 bg-purple-50 rounded">
+                    ⚠️ <strong>Perlu jadi admin?</strong> Jalankan file <code>setup-admin-system.sql</code> dan ganti email di dalamnya.
+                </div>
+            </div>
             {/* Grid Preview */}
             <div>
                 <h3 className="text-lg font-semibold mb-4 text-black">Preview Grid Auto-Generated</h3>

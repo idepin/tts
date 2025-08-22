@@ -7,6 +7,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import { Question, GameState } from '../../types/crossword';
 import { calculateScore } from '../../data/simpleCrosswordData';
 import { CrosswordManager } from '../../utils/CrosswordManager';
+import { CrosswordService } from '../../lib/crosswordService';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function Gameplay() {
@@ -22,11 +23,69 @@ export default function Gameplay() {
     });
     const [activeQuestion, setActiveQuestion] = useState<Question | null>(null);
     const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [adminCheckLoading, setAdminCheckLoading] = useState(true);
+
+    // Check admin status
+    useEffect(() => {
+        const checkAdminStatus = async () => {
+            try {
+                const adminStatus = await CrosswordService.isAdmin();
+                setIsAdmin(adminStatus);
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+                setIsAdmin(false);
+            } finally {
+                setAdminCheckLoading(false);
+            }
+        };
+
+        checkAdminStatus();
+    }, []);
 
     // Load latest data when component mounts and on window focus
     useEffect(() => {
-        const loadData = () => {
-            setCrosswordData(CrosswordManager.getInstance().getData());
+        const generateGridFromQuestions = (questions: Question[]): (string | null)[][] => {
+            const gridSize = 10;
+            const grid: (string | null)[][] = Array(gridSize).fill(null).map(() => Array(gridSize).fill(null));
+
+            questions.forEach(question => {
+                for (let i = 0; i < question.answer.length; i++) {
+                    const row = question.direction === 'horizontal' ? question.startRow : question.startRow + i;
+                    const col = question.direction === 'horizontal' ? question.startCol + i : question.startCol;
+
+                    if (row >= 0 && row < gridSize && col >= 0 && col < gridSize) {
+                        grid[row][col] = question.answer[i];
+                    }
+                }
+            });
+
+            return grid;
+        };
+
+        const loadData = async () => {
+            try {
+                // First try to load from Supabase
+                const gameData = await CrosswordService.getActiveGame();
+                if (gameData && gameData.questions.length > 0) {
+                    // Update CrosswordManager with Supabase data
+                    const manager = CrosswordManager.getInstance();
+                    manager.updateData({
+                        questions: gameData.questions,
+                        grid: generateGridFromQuestions(gameData.questions)
+                    });
+                    setCrosswordData(manager.getData());
+                    console.log('Loaded crossword data from Supabase');
+                } else {
+                    // Fallback to localStorage/default data
+                    setCrosswordData(CrosswordManager.getInstance().getData());
+                    console.log('Loaded crossword data from local storage');
+                }
+            } catch (error) {
+                console.error('Error loading crossword data:', error);
+                // Fallback to localStorage/default data
+                setCrosswordData(CrosswordManager.getInstance().getData());
+            }
         };
 
         loadData();
@@ -251,12 +310,14 @@ export default function Gameplay() {
                                     Go to Login
                                 </button>
                             )}
-                            <a
-                                href="/admin"
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors"
-                            >
-                                Admin
-                            </a>
+                            {isAdmin && (
+                                <a
+                                    href="/admin"
+                                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded text-sm transition-colors"
+                                >
+                                    Admin
+                                </a>
+                            )}
                         </div>
                     </div>
 

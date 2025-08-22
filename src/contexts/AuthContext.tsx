@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 setSession(session);
                 setUser(session?.user || null);
                 setLoading(false);
-                
+
                 // Simple redirect after successful login
                 if (event === 'SIGNED_IN' && session) {
                     console.log('User signed in, redirecting to gameplay...');
