@@ -20,10 +20,14 @@ export default function Leaderboard() {
     }, []);
 
     useEffect(() => {
-        if (selectedGameId) {
+        if (selectedGameId === 'all' && games.length > 0) {
+            // Only load scores for 'all' when games are loaded
+            loadScores();
+        } else if (selectedGameId !== 'all' && selectedGameId) {
+            // For specific games, load immediately
             loadScores();
         }
-    }, [selectedGameId]);
+    }, [selectedGameId, games]);
 
     const loadGames = async () => {
         try {
@@ -88,6 +92,27 @@ export default function Leaderboard() {
         return Math.round((score.correct_answers / score.total_questions) * 100);
     };
 
+    const handleRefresh = async () => {
+        console.log('🔄 Refreshing leaderboard data...');
+        await loadGames();
+        if (selectedGameId === 'all' && games.length > 0) {
+            await loadScores();
+        } else if (selectedGameId !== 'all') {
+            await loadScores();
+        }
+    };
+
+    // Auto-refresh every 30 seconds when page is focused
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                handleRefresh();
+            }
+        }, 30000);
+
+        return () => clearInterval(interval);
+    }, [selectedGameId, games]);
+
     return (
         <ProtectedRoute>
             <div className="min-h-screen bg-gray-100 p-4">
@@ -97,6 +122,13 @@ export default function Leaderboard() {
                         <div className="flex items-center justify-between mb-6">
                             <h1 className="text-3xl font-bold text-black">🏆 Leaderboard</h1>
                             <div className="flex items-center gap-4">
+                                <button
+                                    onClick={handleRefresh}
+                                    disabled={isLoading}
+                                    className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded transition-colors"
+                                >
+                                    {isLoading ? '🔄' : '🔄'} Refresh
+                                </button>
                                 <a
                                     href="/gameplay"
                                     className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
