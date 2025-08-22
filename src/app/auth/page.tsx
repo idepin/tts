@@ -1,9 +1,19 @@
 'use client';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import LoginForm from '../components/LoginForm';
 
 export default function Auth() {
     const { user, loading } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+        // Redirect to gameplay if user is logged in
+        if (!loading && user) {
+            router.push('/gameplay');
+        }
+    }, [user, loading, router]);
 
     // Show loading while checking auth status
     if (loading) {
@@ -17,7 +27,7 @@ export default function Auth() {
         );
     }
 
-    // If user is logged in, show loading while middleware redirects
+    // If user is logged in, show loading while redirecting
     if (user) {
         return (
             <div className="min-h-screen bg-gray-100 flex items-center justify-center">

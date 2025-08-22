@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
     user: User | null;
@@ -30,7 +29,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
-    const router = useRouter();
 
     useEffect(() => {
         // Get initial session
@@ -48,19 +46,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 setUser(session?.user || null);
                 setLoading(false);
 
-                // Simple redirect after successful login
+                // Don't redirect here - let page components handle navigation
                 if (event === 'SIGNED_IN' && session) {
-                    console.log('User signed in, redirecting to gameplay...');
-                    // Use timeout to avoid race conditions
-                    setTimeout(() => {
-                        router.push('/gameplay');
-                    }, 100);
+                    console.log('User signed in successfully');
                 }
             }
         );
 
         return () => subscription.unsubscribe();
-    }, [router]);
+    }, []);
 
     const signOut = async () => {
         await supabase.auth.signOut();
