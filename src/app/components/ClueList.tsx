@@ -22,6 +22,9 @@ export default function ClueList({
         const isCompleted = completedQuestions.includes(question.id);
         const isActive = activeQuestionId === question.id;
 
+        // Find the global index of this question in the full questions array
+        const globalIndex = questions.findIndex(q => q.id === question.id);
+
         return (
             <li
                 key={question.id}
@@ -32,7 +35,7 @@ export default function ClueList({
         `}
                 onClick={() => onQuestionClick(question)}
             >
-                <span className="font-bold">{question.number}.</span> {question.clue}
+                <span className="font-bold">{globalIndex + 1}.</span> {question.clue}
                 {isCompleted && <span className="ml-2 text-green-600">✓</span>}
             </li>
         );

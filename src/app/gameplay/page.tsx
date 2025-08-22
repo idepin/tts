@@ -124,12 +124,22 @@ export default function Gameplay() {
     };
 
     const isNumberedCell = (row: number, col: number): { isNumbered: boolean; number?: number } => {
-        const question = crosswordData.questions.find(q =>
+        // Find questions that start at this position
+        const questionsAtPosition = crosswordData.questions.filter(q =>
             q.startRow === row && q.startCol === col
         );
+
+        if (questionsAtPosition.length === 0) {
+            return { isNumbered: false };
+        }
+
+        // Get the first question at this position and calculate its global display number
+        const question = questionsAtPosition[0];
+        const globalIndex = crosswordData.questions.findIndex(q => q.id === question.id);
+
         return {
-            isNumbered: !!question,
-            number: question?.number
+            isNumbered: true,
+            number: globalIndex + 1
         };
     };
 
