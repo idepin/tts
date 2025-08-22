@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef, useEffect } from 'react'
 
 interface WordBoxProps {
     letter?: string | null;
@@ -10,6 +10,8 @@ interface WordBoxProps {
     onInputChange?: (value: string) => void;
     value?: string;
     readOnly?: boolean;
+    focused?: boolean;
+    onKeyDown?: (e: React.KeyboardEvent) => void;
 }
 
 export default function WordBox({
@@ -21,12 +23,29 @@ export default function WordBox({
     onClick,
     onInputChange,
     value,
-    readOnly = false
+    readOnly = false,
+    focused = false,
+    onKeyDown
 }: WordBoxProps) {
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (focused && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [focused]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.value.toUpperCase();
         if (newValue.length <= 1 && onInputChange) {
             onInputChange(newValue);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (onKeyDown) {
+            onKeyDown(e);
         }
     };
 
@@ -56,9 +75,11 @@ export default function WordBox({
                 <span className="font-bold text-gray-800">{letter}</span>
             ) : (
                 <input
+                    ref={inputRef}
                     type="text"
                     value={value || ''}
                     onChange={handleChange}
+                    onKeyDown={handleKeyDown}
                     className="w-full h-full text-center bg-transparent border-none outline-none font-bold text-gray-800"
                     maxLength={1}
                 />

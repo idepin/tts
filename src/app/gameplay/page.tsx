@@ -19,6 +19,7 @@ export default function Gameplay() {
         isCompleted: false
     });
     const [activeQuestion, setActiveQuestion] = useState<Question | null>(null);
+    const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
 
     // Load latest data when component mounts and on window focus
     useEffect(() => {
@@ -70,6 +71,9 @@ export default function Gameplay() {
     const handleCellClick = (row: number, col: number) => {
         if (crosswordData.grid[row][col] === null) return;
 
+        // Set focused cell
+        setFocusedCell({ row, col });
+
         // Find questions that intersect with this cell
         const intersectingQuestions = crosswordData.questions.filter(question => {
             if (question.direction === 'horizontal') {
@@ -88,6 +92,34 @@ export default function Gameplay() {
         }
     };
 
+    const handleKeyDown = (row: number, col: number, e: React.KeyboardEvent) => {
+        if (!activeQuestion) return;
+
+        let nextRow = row;
+        let nextCol = col;
+
+        switch (e.key) {
+            case 'Backspace':
+                if (!gameState.userAnswers[`${row}-${col}`]) {
+                    // If current cell is empty, move to previous cell
+                    if (activeQuestion.direction === 'horizontal') {
+                        nextCol = col - 1;
+                        if (nextCol >= activeQuestion.startCol &&
+                            crosswordData.grid[nextRow][nextCol] !== null) {
+                            setFocusedCell({ row: nextRow, col: nextCol });
+                        }
+                    } else {
+                        nextRow = row - 1;
+                        if (nextRow >= activeQuestion.startRow &&
+                            crosswordData.grid[nextRow][nextCol] !== null) {
+                            setFocusedCell({ row: nextRow, col: nextCol });
+                        }
+                    }
+                }
+                break;
+        }
+    };
+
     const handleInputChange = (row: number, col: number, value: string) => {
         const cellKey = `${row}-${col}`;
         setGameState(prev => ({
@@ -97,10 +129,44 @@ export default function Gameplay() {
                 [cellKey]: value
             }
         }));
+
+        // Auto-advance to next cell if value is entered and there's an active question
+        if (value && activeQuestion) {
+            let nextRow = row;
+            let nextCol = col;
+
+            if (activeQuestion.direction === 'horizontal') {
+                nextCol = col + 1;
+                // Check if next cell is within the question bounds and grid
+                if (nextCol < activeQuestion.startCol + activeQuestion.answer.length &&
+                    nextCol < crosswordData.grid[0].length &&
+                    crosswordData.grid[nextRow][nextCol] !== null) {
+                    // Small delay to ensure state update is complete
+                    setTimeout(() => {
+                        setFocusedCell({ row: nextRow, col: nextCol });
+                    }, 10);
+                }
+            } else {
+                nextRow = row + 1;
+                // Check if next cell is within the question bounds and grid
+                if (nextRow < activeQuestion.startRow + activeQuestion.answer.length &&
+                    nextRow < crosswordData.grid.length &&
+                    crosswordData.grid[nextRow][nextCol] !== null) {
+                    // Small delay to ensure state update is complete
+                    setTimeout(() => {
+                        setFocusedCell({ row: nextRow, col: nextCol });
+                    }, 10);
+                }
+            }
+        } else if (!value) {
+            // If value is empty (backspace), keep focus on current cell
+            setFocusedCell({ row, col });
+        }
     };
 
     const handleQuestionClick = (question: Question) => {
         setActiveQuestion(question);
+        setFocusedCell({ row: question.startRow, col: question.startCol });
     };
 
     const handleReset = () => {
@@ -111,6 +177,7 @@ export default function Gameplay() {
             isCompleted: false
         });
         setActiveQuestion(null);
+        setFocusedCell(null);
     };
 
     const handleUpdateQuestions = (newQuestions: Question[]) => {
@@ -172,6 +239,7 @@ export default function Gameplay() {
                                         const cellKey = `${rowIndex}-${colIndex}`;
                                         const { isNumbered, number } = isNumberedCell(rowIndex, colIndex);
                                         const isActive = isCellInActiveQuestion(rowIndex, colIndex);
+                                        const isFocused = focusedCell?.row === rowIndex && focusedCell?.col === colIndex;
                                         const isCorrect = gameState.completedQuestions.some(qId => {
                                             const question = crosswordData.questions.find(q => q.id === qId);
                                             if (!question) return false;
@@ -198,7 +266,9 @@ export default function Gameplay() {
                                                 value={gameState.userAnswers[cellKey] || ''}
                                                 onClick={() => handleCellClick(rowIndex, colIndex)}
                                                 onInputChange={(value) => handleInputChange(rowIndex, colIndex, value)}
+                                                onKeyDown={(e) => handleKeyDown(rowIndex, colIndex, e)}
                                                 readOnly={false}
+                                                focused={isFocused}
                                             />
                                         );
                                     })
