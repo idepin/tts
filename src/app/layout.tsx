@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "../contexts/AuthContext";
+import ClientWrapper from "../components/ClientWrapper";
 
 export const metadata: Metadata = {
   title: "Teka-Teki Silang",
@@ -26,9 +26,9 @@ export default function RootLayout({
         className="font-sans antialiased"
         suppressHydrationWarning={true}
       >
-        <AuthProvider>
+        <ClientWrapper>
           {children}
-        </AuthProvider>
+        </ClientWrapper>
       </body>
     </html>
   );
