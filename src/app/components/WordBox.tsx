@@ -58,8 +58,9 @@ export default function WordBox({
     return (
         <div
             className={`
-        relative box-border border-2 flex justify-center items-center text-base 
+        relative box-border border-2 flex justify-center items-center
         w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 lg:w-16 lg:h-16
+        text-xs sm:text-sm md:text-base lg:text-lg
         ${isActive ? 'border-blue-500 bg-blue-100' : 'border-gray-400 bg-white'}
         ${isCorrect ? 'bg-green-100 border-green-500' : ''}
         cursor-pointer
@@ -67,12 +68,12 @@ export default function WordBox({
             onClick={onClick}
         >
             {isNumbered && number && (
-                <span className="absolute top-0 left-0 text-xs font-bold text-gray-600 ml-1">
+                <span className="absolute top-0 left-0 text-[8px] sm:text-[9px] md:text-[10px] lg:text-xs font-bold text-gray-600 ml-0.5 sm:ml-1">
                     {number}
                 </span>
             )}
             {readOnly ? (
-                <span className="font-bold text-gray-800">{letter}</span>
+                <span className="font-bold text-gray-800 text-xs sm:text-sm md:text-base lg:text-lg">{letter}</span>
             ) : (
                 <input
                     ref={inputRef}
@@ -80,7 +81,7 @@ export default function WordBox({
                     value={value || ''}
                     onChange={handleChange}
                     onKeyDown={handleKeyDown}
-                    className="w-full h-full text-center bg-transparent border-none outline-none font-bold text-gray-800"
+                    className="w-full h-full text-center bg-transparent border-none outline-none font-bold text-gray-800 text-xs sm:text-sm md:text-base lg:text-lg"
                     maxLength={1}
                 />
             )}

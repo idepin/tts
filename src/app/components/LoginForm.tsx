@@ -18,13 +18,13 @@ export default function LoginForm() {
         setIsLoading(true);
         setError(null);
         try {
-            // Use environment variable for redirect URL
+            // Use environment variable for redirect URL - redirect to root for OAuth callback
             const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
 
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${redirectUrl}/auth?from=google`
+                    redirectTo: `${redirectUrl}/`
                 }
             });
 
