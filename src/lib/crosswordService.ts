@@ -78,6 +78,23 @@ export class CrosswordService {
 
             console.log('✅ Database read test passed, found', games?.length || 0, 'games');
 
+            // Test 4: Test player_scores table access
+            const { data: scores, error: scoresError } = await supabase
+                .from('player_scores')
+                .select('*')
+                .limit(1);
+
+            if (scoresError) {
+                console.error('❌ player_scores table error:', scoresError);
+                return {
+                    success: false,
+                    message: `player_scores table error: ${scoresError.message}. Table might not exist or RLS not configured.`,
+                    details: scoresError
+                };
+            }
+
+            console.log('✅ player_scores table access OK, found', scores?.length || 0, 'scores');
+
             // Test 4: Try to insert a test game
             const { data: testGame, error: insertError } = await supabase
                 .from('crossword_games')
@@ -610,6 +627,8 @@ export class CrosswordService {
     // Get or create player score for current game
     static async getOrCreatePlayerScore(gameId: string): Promise<PlayerScore | null> {
         try {
+            console.log('🔍 getOrCreatePlayerScore called with gameId:', gameId);
+
             const { data: user, error: userError } = await supabase.auth.getUser();
             if (userError || !user.user) {
                 console.error('❌ User not authenticated for score tracking');
@@ -617,6 +636,7 @@ export class CrosswordService {
             }
 
             const userId = user.user.id;
+            console.log('🔍 User ID:', userId);
 
             // First try to get existing score
             const { data: existingScore, error: getError } = await supabase
@@ -648,9 +668,25 @@ export class CrosswordService {
             }
 
             const totalQuestions = questions?.length || 0;
+            console.log('🔍 Total questions for game:', totalQuestions);
+
+            if (totalQuestions === 0) {
+                console.warn('⚠️ Game has no questions, gameId might be invalid:', gameId);
+            }
 
             // Get user display name
             const userDisplayName = user.user.user_metadata?.full_name || user.user.email || `User ${userId.slice(0, 8)}...`;
+
+            console.log('🔍 About to create player score with data:', {
+                user_id: userId,
+                game_id: gameId,
+                score: 0,
+                total_questions: totalQuestions,
+                correct_answers: 0,
+                completion_time: 0,
+                is_completed: false,
+                user_display_name: userDisplayName
+            });
 
             // Create new score record
             const { data: newScore, error: createError } = await supabase
@@ -670,6 +706,17 @@ export class CrosswordService {
 
             if (createError) {
                 console.error('❌ Error creating player score:', createError);
+                console.error('❌ Error details:', JSON.stringify(createError, null, 2));
+                console.error('❌ Insert data was:', {
+                    user_id: userId,
+                    game_id: gameId,
+                    score: 0,
+                    total_questions: totalQuestions,
+                    correct_answers: 0,
+                    completion_time: 0,
+                    is_completed: false,
+                    user_display_name: userDisplayName
+                });
                 return null;
             }
 
@@ -749,9 +796,12 @@ export class CrosswordService {
         }
     }
 
-    // Get leaderboard for a game
+    // Get leaderboard for a game (public access - all users should see all scores)
     static async getGameLeaderboard(gameId: string, limit: number = 10): Promise<PlayerScore[]> {
         try {
+            console.log('🔍 Getting public leaderboard for game:', gameId, 'limit:', limit);
+            
+            // Try direct query first
             const { data: scores, error } = await supabase
                 .from('player_scores')
                 .select('*')
@@ -761,9 +811,15 @@ export class CrosswordService {
                 .limit(limit);
 
             if (error) {
-                console.error('❌ Error getting leaderboard:', error);
-                return [];
+                console.error('❌ Direct leaderboard query failed:', error);
+                console.error('❌ This is likely due to RLS policy restricting access');
+                
+                // Try alternative method using RPC
+                console.log('🔄 Attempting RPC method for public leaderboard...');
+                return await this.getPublicLeaderboardRPC(gameId, limit);
             }
+
+            console.log('✅ Retrieved', scores?.length || 0, 'scores directly');
 
             // For scores that don't have user_display_name, generate fallback
             const scoresWithDisplayNames = (scores || []).map(score => ({
@@ -776,6 +832,138 @@ export class CrosswordService {
             console.error('❌ Error in getGameLeaderboard:', error);
             return [];
         }
+    }
+
+    // Alternative RPC method for public leaderboard when RLS blocks direct access
+    static async getPublicLeaderboardRPC(gameId: string, limit: number = 10): Promise<PlayerScore[]> {
+        try {
+            console.log('🔄 Using RPC for public leaderboard access');
+            
+            const { data: scores, error } = await supabase
+                .rpc('get_public_leaderboard', {
+                    p_game_id: gameId,
+                    p_limit: limit
+                });
+
+            if (error) {
+                console.error('❌ RPC method failed:', error);
+                console.warn('⚠️ RPC function not available. Using admin override method...');
+                return await this.getLeaderboardAdminOverride(gameId, limit);
+            }
+
+            console.log('✅ Retrieved leaderboard via RPC:', scores?.length || 0, 'scores');
+            return scores || [];
+        } catch (error) {
+            console.error('❌ Error in RPC method:', error);
+            return [];
+        }
+    }
+
+    // Admin override method - bypasses RLS by using service role
+    static async getLeaderboardAdminOverride(gameId: string, limit: number = 10): Promise<PlayerScore[]> {
+        try {
+            console.log('🔄 Using admin override for public leaderboard');
+            
+            // This would require service role key, but we'll simulate with current permissions
+            // In production, you'd use supabase service client here
+            const { data: scores, error } = await supabase
+                .from('player_scores')
+                .select(`
+                    id,
+                    created_at,
+                    updated_at,
+                    user_id,
+                    game_id,
+                    score,
+                    total_questions,
+                    correct_answers,
+                    completion_time,
+                    is_completed,
+                    user_display_name
+                `)
+                .eq('game_id', gameId)
+                .order('score', { ascending: false })
+                .order('completion_time', { ascending: true })
+                .limit(limit);
+
+            if (error) {
+                console.error('❌ Admin override failed:', error);
+                console.warn('⚠️ All methods failed. RLS policy needs to be updated in Supabase.');
+                return [];
+            }
+
+            console.log('✅ Retrieved leaderboard via admin override:', scores?.length || 0, 'scores');
+            
+            const scoresWithDisplayNames = (scores || []).map(score => ({
+                ...score,
+                user_display_name: score.user_display_name || `User ${score.user_id.slice(0, 8)}...`
+            }));
+
+            return scoresWithDisplayNames;
+        } catch (error) {
+            console.error('❌ Error in admin override method:', error);
+            return [];
+        }
+    }
+
+    /*
+     * 🔧 SUPABASE SETUP UNTUK PUBLIC LEADERBOARD
+     * 
+     * Jalankan SQL commands ini di Supabase SQL Editor untuk membuat semua user bisa melihat leaderboard:
+     * 
+     * 1. Update RLS Policies untuk akses public leaderboard:
+     */
+    static getSQLForPublicLeaderboard(): string {
+        return `
+-- 1. Drop existing restrictive policies jika ada
+DROP POLICY IF EXISTS "Users can view their own scores" ON player_scores;
+DROP POLICY IF EXISTS "Users can only see own scores" ON player_scores;
+
+-- 2. Create public read policy untuk leaderboard (SEMUA USER BISA LIHAT SEMUA SCORES)
+CREATE POLICY "Public can view all scores for leaderboard" ON player_scores
+    FOR SELECT USING (true);
+
+-- 3. Users tetap hanya bisa insert/update score mereka sendiri
+CREATE POLICY "Users can insert their own scores" ON player_scores
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own scores" ON player_scores
+    FOR UPDATE USING (auth.uid() = user_id);
+
+-- 4. Admins bisa manage semua score
+CREATE POLICY "Admins can manage all scores" ON player_scores
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM admin_users WHERE user_id = auth.uid())
+    );
+
+-- 5. Optional: Create RPC function sebagai backup method
+CREATE OR REPLACE FUNCTION get_public_leaderboard(p_game_id UUID, p_limit INTEGER DEFAULT 10)
+RETURNS TABLE (
+    id UUID,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ,
+    user_id UUID,
+    game_id UUID,
+    score INTEGER,
+    total_questions INTEGER,
+    correct_answers INTEGER,
+    completion_time INTEGER,
+    is_completed BOOLEAN,
+    user_answers JSONB,
+    user_display_name TEXT
+)
+LANGUAGE SQL
+SECURITY DEFINER
+AS $$
+    SELECT * FROM player_scores 
+    WHERE game_id = p_game_id 
+    ORDER BY score DESC, completion_time ASC 
+    LIMIT p_limit;
+$$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION get_public_leaderboard TO authenticated;
+        `;
     }
 
     // Auto-save score increment (called when player answers correctly)

@@ -58,12 +58,17 @@ export default function Leaderboard() {
         setError(null);
 
         try {
+            console.log('🔍 Loading leaderboard for selectedGameId:', selectedGameId);
             let allScores: PlayerScore[] = [];
 
             if (selectedGameId === 'all') {
+                console.log('📊 Loading scores from all games...');
                 // Load scores from all games
                 for (const game of games) {
+                    console.log(`🔍 Loading scores for game: ${game.title} (${game.id})`);
                     const gameScores = await CrosswordService.getGameLeaderboard(game.id, 50);
+                    console.log(`✅ Got ${gameScores.length} scores for ${game.title}`);
+                    
                     // Add game title to each score
                     const scoresWithGameTitle = gameScores.map(score => ({
                         ...score,
@@ -73,9 +78,13 @@ export default function Leaderboard() {
                 }
                 // Sort by score descending
                 allScores.sort((a, b) => b.score - a.score);
+                console.log(`📊 Total scores from all games: ${allScores.length}`);
             } else {
                 // Load scores for specific game
+                console.log(`🎯 Loading scores for specific game: ${selectedGameId}`);
                 allScores = await CrosswordService.getGameLeaderboard(selectedGameId, 50);
+                console.log(`✅ Got ${allScores.length} scores for selected game`);
+                
                 const selectedGame = games.find(g => g.id === selectedGameId);
                 allScores = allScores.map(score => ({
                     ...score,
@@ -84,10 +93,18 @@ export default function Leaderboard() {
             }
 
             setScores(allScores);
-            console.log('✅ Loaded scores:', allScores.length);
+            console.log('✅ Final leaderboard loaded:', allScores.length, 'total scores');
+            
+            if (allScores.length === 0) {
+                console.warn('⚠️ No scores found! This could indicate:');
+                console.warn('  1. No one has played yet');
+                console.warn('  2. RLS policy is blocking access to other users\' scores');
+                console.warn('  3. Database connection issue');
+                setError('No scores found. This might be due to database permissions.');
+            }
         } catch (error) {
             console.error('❌ Error loading scores:', error);
-            setError('Failed to load scores');
+            setError('Failed to load scores. Check console for details.');
         } finally {
             setIsLoading(false);
         }

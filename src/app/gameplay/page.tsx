@@ -32,12 +32,26 @@ export default function Gameplay() {
     const [gameInfo, setGameInfo] = useState<{ title: string; description?: string } | null>(null);
     const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
     const [isAutoSaving, setIsAutoSaving] = useState(false);
-    const profileDropdownRef = useRef<HTMLDivElement>(null);
+    const mobileDropdownRef = useRef<HTMLDivElement>(null);
+    const desktopDropdownRef = useRef<HTMLDivElement>(null);
 
     // Close dropdown when clicking outside (support both mouse and touch)
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-            if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            let clickedInside = false;
+
+            // Check if click is inside mobile dropdown
+            if (mobileDropdownRef.current && mobileDropdownRef.current.contains(target)) {
+                clickedInside = true;
+            }
+
+            // Check if click is inside desktop dropdown
+            if (desktopDropdownRef.current && desktopDropdownRef.current.contains(target)) {
+                clickedInside = true;
+            }
+
+            if (!clickedInside) {
                 setIsProfileOpen(false);
             }
         };
@@ -479,7 +493,7 @@ export default function Gameplay() {
                             {/* Right: Navigation */}
                             <div className="flex items-center gap-2">
                                 {/* Mobile Menu - Hamburger */}
-                                <div className="sm:hidden relative" ref={profileDropdownRef}>
+                                <div className="sm:hidden relative" ref={mobileDropdownRef}>
                                     <button
                                         onClick={() => setIsProfileOpen(!isProfileOpen)}
                                         className="p-2 rounded-lg hover:bg-gray-100 transition-colors touch-manipulation"
@@ -530,11 +544,15 @@ export default function Gameplay() {
                                                     </a>
                                                 )}
                                                 <button
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        console.log('Mobile logout clicked'); // Debug log
                                                         signOut();
                                                         setIsProfileOpen(false);
                                                     }}
                                                     className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left touch-manipulation"
+                                                    type="button"
                                                 >
                                                     <span className="text-lg">🚪</span>
                                                     <span className="text-sm text-gray-700">Logout</span>
@@ -564,7 +582,7 @@ export default function Gameplay() {
                                     )}
 
                                     {/* Desktop Profile Dropdown */}
-                                    <div className="relative">
+                                    <div className="relative" ref={desktopDropdownRef}>
                                         <button
                                             onClick={() => setIsProfileOpen(!isProfileOpen)}
                                             className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors touch-manipulation"
@@ -606,11 +624,15 @@ export default function Gameplay() {
                                                 </div>
                                                 <div className="py-2">
                                                     <button
-                                                        onClick={() => {
+                                                        onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            console.log('Logout clicked'); // Debug log
                                                             signOut();
                                                             setIsProfileOpen(false);
                                                         }}
                                                         className="w-full flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition-colors text-left touch-manipulation"
+                                                        type="button"
                                                     >
                                                         <span className="text-lg">🚪</span>
                                                         <span className="text-sm text-gray-700">Logout</span>
